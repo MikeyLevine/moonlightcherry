@@ -48,22 +48,11 @@ export async function postComment(mediaId: string, content: string, parentId: st
   ]);
 
   const actorId = session.user.id;
-  const actorName = session.user.name ?? "Someone";
 
   if (effectiveParentId && parentAuthorId) {
-    await createNotification(
-      parentAuthorId,
-      "REPLY",
-      { actorId, actorName, mediaId, commentId: comment.id },
-      actorId
-    );
+    await createNotification(parentAuthorId, "REPLY", { actorId, mediaId, commentId: comment.id }, actorId);
   } else if (media.uploaderId) {
-    await createNotification(
-      media.uploaderId,
-      "COMMENT",
-      { actorId, actorName, mediaId, commentId: comment.id },
-      actorId
-    );
+    await createNotification(media.uploaderId, "COMMENT", { actorId, mediaId, commentId: comment.id }, actorId);
   }
 
   const mentionedUsernames = extractMentionedUsernames(trimmed);
@@ -75,7 +64,7 @@ export async function postComment(mediaId: string, content: string, parentId: st
     await createNotifications(
       mentionedUsers.map((u) => u.id),
       "MENTION",
-      { actorId, actorName, mediaId, commentId: comment.id },
+      { actorId, mediaId, commentId: comment.id },
       actorId
     );
   }

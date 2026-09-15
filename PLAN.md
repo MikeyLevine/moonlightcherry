@@ -204,6 +204,8 @@ Single-level replies (comment → replies, no infinite nesting) to keep threads 
 ### Notifications
 Likes, comments, replies, mentions, new followers, moderation events (your content was removed/warned), system announcements. **Polling-based** delivery for v1 (client polls an unread-count/list endpoint on an interval + on navigation) rather than WebSockets — matches the modest-infra constraint and avoids a new stateful realtime service.
 
+**Implemented (Phase 12).** Real `/notifications` and a header bell polling `/api/notifications/unread-count` every 30s. Notification payloads store only stable ids (actorId/mediaId/commentId) — Phase 11's first pass also snapshotted an `actorName` into the payload, which was a mistake caught and fixed before this phase built on it: a snapshotted name goes stale the moment someone changes their username (which had already happened once in this project by Phase 12), so display data is always resolved live from current `User`/`Media` rows instead. Mark-all-read fires from a `useEffect` in a small client component mounted on the page, specifically *not* as a side effect of the Server Component's render — Next prefetches `<Link>`s on hover/viewport, which would otherwise mark notifications read before anyone actually saw them. `MODERATION` and `SYSTEM` types remain wired in the schema/enum with nothing generating them yet — those wait on Phase 15 (moderation actions) and an admin announcements feature that doesn't exist.
+
 ### Views
 Counted via a `ViewEvent` log deduped per (user-or-anon-session, media, rolling 24h window) rather than incrementing on every request, aggregated into `Media.viewCount` by a background job — prevents refresh-spam view inflation and keeps the write path cheap.
 

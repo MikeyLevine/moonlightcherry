@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { doSignOut } from "@/lib/actions";
 
 const NAV_LINKS = [
@@ -48,6 +49,7 @@ export function SiteHeader({ user = null }: { user?: SiteHeaderUser }) {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              <NotificationBell />
               <Link
                 href={user.username ? `/u/${user.username}` : "/settings"}
                 className="hidden items-center gap-2 sm:flex"

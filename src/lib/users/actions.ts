@@ -70,6 +70,6 @@ export async function toggleFollow(targetUserId: string) {
   }
 
   await prisma.follow.create({ data: { followerId, followingId: targetUserId } });
-  await createNotification(targetUserId, "FOLLOW", { actorId: followerId, actorName: session.user.name }, followerId);
+  await createNotification(targetUserId, "FOLLOW", { actorId: followerId }, followerId);
   return { ok: true as const, following: true };
 }

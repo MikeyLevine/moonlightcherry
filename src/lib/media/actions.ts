@@ -32,7 +32,7 @@ export async function toggleLike(mediaId: string) {
   ]);
 
   if (target?.uploaderId) {
-    await createNotification(target.uploaderId, "LIKE", { actorId: userId, actorName: session.user.name, mediaId }, userId);
+    await createNotification(target.uploaderId, "LIKE", { actorId: userId, mediaId }, userId);
   }
 
   return { ok: true as const, active: true, count: media.likeCount };

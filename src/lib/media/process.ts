@@ -146,11 +146,10 @@ export async function processMedia(mediaId: string): Promise<void> {
       select: { followerId: true },
     });
     if (followers.length > 0) {
-      const uploader = await prisma.user.findUnique({ where: { id: media.uploaderId }, select: { name: true } });
       await createNotifications(
         followers.map((f) => f.followerId),
         "NEW_UPLOAD",
-        { actorId: media.uploaderId, actorName: uploader?.name, mediaId: media.id },
+        { actorId: media.uploaderId, mediaId: media.id },
         media.uploaderId
       );
     }
