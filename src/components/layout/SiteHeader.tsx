@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import type { Role } from "@prisma/client";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { doSignOut } from "@/lib/actions";
+import { isModerator } from "@/lib/admin/permissions";
 
 const NAV_LINKS = [
   { href: "/gallery", label: "Gallery" },
@@ -19,6 +21,7 @@ type SiteHeaderUser = {
   name?: string | null;
   image?: string | null;
   username?: string | null;
+  role?: Role;
 } | null;
 
 export function SiteHeader({ user = null }: { user?: SiteHeaderUser }) {
@@ -49,6 +52,11 @@ export function SiteHeader({ user = null }: { user?: SiteHeaderUser }) {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              {isModerator(user.role) ? (
+                <Link href="/admin" className="hidden text-sm text-ash hover:text-moonlight sm:inline">
+                  Admin
+                </Link>
+              ) : null}
               <NotificationBell />
               <Link
                 href={user.username ? `/u/${user.username}` : "/settings"}

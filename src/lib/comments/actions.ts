@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { extractMentionedUsernames } from "@/lib/comments/mentions";
 import { createNotification, createNotifications } from "@/lib/notifications/create";
+import { blocksPosting } from "@/lib/admin/moderationStatus";
 
 const MAX_LENGTH = 2000;
 const AUTHOR_SELECT = { id: true, name: true, username: true, image: true } as const;
@@ -11,6 +12,9 @@ const AUTHOR_SELECT = { id: true, name: true, username: true, image: true } as c
 export async function postComment(mediaId: string, content: string, parentId: string | null) {
   const session = await auth();
   if (!session?.user) return { ok: false as const, error: "Sign in to comment." };
+  if (blocksPosting(session.user.moderationStatus, session.user.moderationUntil)) {
+    return { ok: false as const, error: "Your account can't post comments right now." };
+  }
 
   const trimmed = content.trim();
   if (!trimmed) return { ok: false as const, error: "Comment can't be empty." };

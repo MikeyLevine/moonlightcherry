@@ -19,6 +19,20 @@ enum Role {
   OWNER
 }
 
+// Ordered loosely by severity; TIMED_OUT/SUSPENDED can carry a `moderationUntil`
+// expiry and are treated as auto-lifted once it passes (checked at read time,
+// no cron needed) — MUTED/RESTRICTED/BANNED without an expiry stay in effect
+// until a moderator explicitly reverts them to ACTIVE.
+enum ModerationStatus {
+  ACTIVE
+  WARNED
+  MUTED
+  TIMED_OUT
+  RESTRICTED
+  SUSPENDED
+  BANNED
+}
+
 enum MediaStatus {
   PROCESSING
   PUBLISHED
@@ -120,6 +134,10 @@ model User {
   role        Role    @default(USER)
   nsfwEnabled Boolean @default(false)
 
+  moderationStatus ModerationStatus @default(ACTIVE)
+  moderationUntil  DateTime?
+  moderationReason String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -212,6 +230,7 @@ model Media {
   description  String?     @db.Text
   status       MediaStatus @default(PROCESSING)
   nsfw         Boolean     @default(false)
+  featured     Boolean     @default(false)
 
   mimeType String
   width    Int

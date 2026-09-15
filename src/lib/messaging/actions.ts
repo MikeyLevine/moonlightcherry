@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateConversation, isBlockedEitherWay, toMessageView } from "@/lib/messaging/queries";
+import { blocksPosting } from "@/lib/admin/moderationStatus";
 
 const MAX_LENGTH = 4000;
 
@@ -21,6 +22,9 @@ export async function startConversation(targetUserId: string) {
 export async function sendMessage(conversationId: string, content: string) {
   const session = await auth();
   if (!session?.user) return { ok: false as const, error: "Sign in to send messages." };
+  if (blocksPosting(session.user.moderationStatus, session.user.moderationUntil)) {
+    return { ok: false as const, error: "Your account can't send messages right now." };
+  }
 
   const trimmed = content.trim();
   if (!trimmed) return { ok: false as const, error: "Message can't be empty." };

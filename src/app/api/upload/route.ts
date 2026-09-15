@@ -8,6 +8,7 @@ import { putMediaFile, checkStorageHeadroom } from "@/lib/media/storage";
 import { getUploadLimits } from "@/lib/site-settings";
 import { enqueueProcessMedia } from "@/lib/media/queue";
 import { syncMediaAssociations } from "@/lib/taxonomy/sync";
+import { blocksUploading } from "@/lib/admin/moderationStatus";
 
 const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "You must be signed in to upload." }, { status: 401 });
+  }
+  if (blocksUploading(session.user.moderationStatus, session.user.moderationUntil)) {
+    return NextResponse.json({ error: "Your account can't upload right now." }, { status: 403 });
   }
 
   const limits = await getUploadLimits();
