@@ -6,9 +6,10 @@ const base =
   "inline-flex items-center justify-center gap-2 rounded-sm text-sm font-bold px-[18px] py-[9px] transition-colors whitespace-nowrap";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-cherry text-on-cherry hover:bg-ember",
-  ghost: "bg-transparent text-moonlight border border-white/15 hover:border-moonlight",
-  text: "bg-transparent text-ash hover:text-moonlight px-1 py-[9px]",
+  primary: "bg-cherry text-on-cherry hover:bg-ember disabled:opacity-40 disabled:pointer-events-none",
+  ghost:
+    "bg-transparent text-moonlight border border-white/15 hover:border-moonlight disabled:opacity-40 disabled:pointer-events-none",
+  text: "bg-transparent text-ash hover:text-moonlight px-1 py-[9px] disabled:opacity-40 disabled:pointer-events-none",
 };
 
 type ButtonProps = {
@@ -18,6 +19,7 @@ type ButtonProps = {
   href?: string;
   onClick?: () => void;
   type?: "button" | "submit";
+  disabled?: boolean;
 };
 
 export function Button({
@@ -27,6 +29,7 @@ export function Button({
   href,
   onClick,
   type = "button",
+  disabled = false,
 }: ButtonProps) {
   const classes = `${base} ${variantClasses[variant]} ${className}`;
 
@@ -39,7 +42,7 @@ export function Button({
   }
 
   return (
-    <button type={type} onClick={onClick} className={classes}>
+    <button type={type} onClick={onClick} disabled={disabled} className={classes}>
       {children}
     </button>
   );

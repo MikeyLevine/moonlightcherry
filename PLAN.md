@@ -128,6 +128,12 @@ GIFs are large and expensive to serve raw at scale, so:
 ### Async processing
 Given the existing stack (Docker Compose, Postgres, no Redis), background jobs run via a **Postgres-native job queue** (e.g. `pg-boss` or `graphile-worker`) rather than adding Redis/BullMQ — this avoids a new stateful service while still giving us reliable async processing, retries, and scheduled/cron-style jobs (storage scans, trending recompute, soft-delete purge). **Flagged in §20** in case you'd rather add Redis for a more conventional queue.
 
+### Implemented (Phase 4)
+
+The pipeline above (steps 1–6) is live: `src/lib/media/validate.ts` (magic-byte sniffing via `file-type`, size/dimension checks against live `SiteSetting` values), `src/lib/media/storage.ts` (content-addressed local disk storage, sharded by hash prefix, plus a real disk-headroom check that blocks uploads past the configured threshold), `src/lib/media/process.ts` (variant generation via `sharp` — thumbnail/small/medium for static images, poster/animated-preview/animated-medium for GIFs), and `pg-boss` as the job queue with a standalone worker process (`scripts/worker.ts`, `npm run worker`) — a separate process from the web server, matching the planned architecture. `/upload` and `/i/[id]` are minimally real (functional end-to-end, not styled/complete — full metadata selection and the polished media page are Phases 9 and 6 respectively).
+
+**Step 3 (CSAM screening) is explicitly NOT implemented.** `src/lib/media/csam-screen.ts` is a clearly-labeled stub that lets every upload through and logs a loud warning every time it's called. This remains open item §20.3 — a real provider (Thorn Safer, NCMEC hash-matching, etc.) must be evaluated and wired in before this platform handles real, public uploads. Do not treat the current pipeline as safe for that.
+
 ---
 
 ## 7. Database Architecture
