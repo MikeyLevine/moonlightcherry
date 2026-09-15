@@ -13,6 +13,8 @@ import { ShareButton } from "@/components/media/ShareButton";
 import { MediaLightbox } from "@/components/media/MediaLightbox";
 import { ViewBeacon } from "@/components/media/ViewBeacon";
 import { AssociationEditor } from "@/components/media/AssociationEditor";
+import { AddToCollectionButton } from "@/components/collections/AddToCollectionButton";
+import { getViewerCollectionsWithMembership } from "@/lib/collections/queries";
 import { ChipLink } from "@/components/ui/Chip";
 import { buttonBaseClasses, buttonVariantClasses } from "@/components/ui/Button";
 import { ProcessingPoller } from "./ProcessingPoller";
@@ -42,6 +44,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
   const engagement = await getViewerEngagement(media.id, viewer.userId);
   const isOwnerOrEditor = canEditMedia(viewer, media.uploaderId);
   const allCategories = isOwnerOrEditor ? await getPopularCategories() : [];
+  const viewerCollections = viewer.userId ? await getViewerCollectionsWithMembership(viewer.userId, media.id) : [];
 
   const small = media.variants.find((v) => v.kind === "SMALL");
   const medium = media.variants.find((v) => v.kind === "MEDIUM");
@@ -105,6 +108,11 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
             initialFavoriteCount={media.favoriteCount}
           />
           <ShareButton title={media.title ?? "Moonlight Cherry"} />
+          <AddToCollectionButton
+            mediaId={media.id}
+            isAuthenticated={Boolean(viewer.userId)}
+            initialCollections={viewerCollections}
+          />
           {original ? (
             <a
               href={original.url}

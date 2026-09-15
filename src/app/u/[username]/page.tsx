@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getUserByUsername, isFollowing, getMostUsedTags } from "@/lib/users/queries";
+import { getUserCollections } from "@/lib/collections/queries";
 import { getViewerContext, getMediaPage } from "@/lib/media/query";
 import { MediaGrid, EmptyMediaState } from "@/components/media/MediaGrid";
 import { ChipLink } from "@/components/ui/Chip";
@@ -26,10 +28,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
   const viewer = await getViewerContext();
   const isOwnProfile = viewer.userId === user.id;
 
-  const [following, mostUsedTags, mediaPage] = await Promise.all([
+  const [following, mostUsedTags, mediaPage, collections] = await Promise.all([
     isOwnProfile ? Promise.resolve(false) : isFollowing(viewer.userId, user.id),
     getMostUsedTags(user.id),
     getMediaPage("recent", { viewer, take: 24, uploaderId: user.id }),
+    getUserCollections(user.id, viewer),
   ]);
 
   const joined = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(user.createdAt);
@@ -101,7 +104,41 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         )}
       </div>
 
-      <p className="mt-10 text-xs text-ash">Collections and public favorites will show here once that&rsquo;s built.</p>
+      {collections.length > 0 ? (
+        <div className="mt-8 border-t border-white/[0.09] pt-8">
+          <h2 className="mb-5 text-xl text-moonlight">Collections</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {collections.map((c) => {
+              const coverVariant = c.items[0]?.media.variants.find(
+                (v) => v.kind === "THUMBNAIL" || v.kind === "POSTER"
+              );
+              return (
+                <Link
+                  key={c.id}
+                  href={`/collections/${c.id}`}
+                  className="rounded-md border border-white/[0.09] bg-charcoal p-4 transition-colors hover:border-white/20"
+                >
+                  <div
+                    className="mb-3 flex aspect-video items-center justify-center overflow-hidden rounded-sm bg-charcoal-2 bg-cover bg-center"
+                    style={coverVariant ? { backgroundImage: `url(${coverVariant.url})` } : undefined}
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-base text-moonlight">{c.name}</span>
+                    {c.visibility === "PRIVATE" ? (
+                      <span className="rounded-sm border border-white/20 px-1.5 py-0.5 text-[10px] font-bold text-ash">
+                        Private
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs text-ash">{c._count.items} items</p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <p className="mt-10 text-xs text-ash">Public favorites will show here once that&rsquo;s built.</p>
     </div>
   );
 }

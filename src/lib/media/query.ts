@@ -39,7 +39,7 @@ export function visibleMediaWhere(viewer: ViewerContext): Prisma.MediaWhereInput
   };
 }
 
-const CARD_SELECT = {
+export const CARD_SELECT = {
   id: true,
   title: true,
   width: true,
@@ -66,6 +66,8 @@ type ListOptions = {
   characterSlug?: string | null;
   seriesSlug?: string | null;
   uploaderId?: string | null;
+  favoritedByUserId?: string | null;
+  likedByUserId?: string | null;
   /** Matches title OR uploader name/username — covers "search by uploader"
    * without needing profile pages (Phase 8) to exist yet. */
   searchQuery?: string | null;
@@ -84,6 +86,8 @@ export async function getMediaPage(
     characterSlug = null,
     seriesSlug = null,
     uploaderId = null,
+    favoritedByUserId = null,
+    likedByUserId = null,
     searchQuery = null,
   } = options;
 
@@ -94,6 +98,8 @@ export async function getMediaPage(
     ...(characterSlug ? { characters: { some: { character: { slug: characterSlug } } } } : {}),
     ...(seriesSlug ? { series: { some: { series: { slug: seriesSlug } } } } : {}),
     ...(uploaderId ? { uploaderId } : {}),
+    ...(favoritedByUserId ? { favorites: { some: { userId: favoritedByUserId } } } : {}),
+    ...(likedByUserId ? { likes: { some: { userId: likedByUserId } } } : {}),
     ...(searchQuery
       ? {
           OR: [
@@ -136,6 +142,24 @@ export function getRecentMedia(options: ListOptions) {
 
 export function getMostLikedMedia(options: ListOptions) {
   return getMediaPage("most-liked", options);
+}
+
+const OWN_UPLOAD_SELECT = {
+  ...CARD_SELECT,
+  status: true,
+} satisfies Prisma.MediaSelect;
+
+export type OwnUploadCard = Prisma.MediaGetPayload<{ select: typeof OWN_UPLOAD_SELECT }>;
+
+/** A user's own uploads in every status (including still-PROCESSING) — a
+ * management view, not a public listing, so it deliberately doesn't go
+ * through visibleMediaWhere(). */
+export async function getMyUploads(userId: string): Promise<OwnUploadCard[]> {
+  return prisma.media.findMany({
+    where: { uploaderId: userId, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: OWN_UPLOAD_SELECT,
+  });
 }
 
 export async function getRandomMediaId(viewer: ViewerContext): Promise<string | null> {

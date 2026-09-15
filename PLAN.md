@@ -211,6 +211,8 @@ Counted via a `ViewEvent` log deduped per (user-or-anon-session, media, rolling 
 
 Name, description, cover image (defaults to first/most-recent item if unset), public/private visibility, media count, add/remove media. Private collections are excluded from profile pages, search, and sitemaps for other viewers (owner-only visibility check at the same shared data-access layer as NSFW filtering).
 
+**Implemented (Phase 10).** `/dashboard/collections` (create/edit/delete, both visibilities) and the public `/collections/[id]` view. "Save to collection" lives on `/i/[id]` itself — a dropdown of your own collections with checkboxes, plus inline creation. Cover image is always derived from the most-recently-added item's thumbnail (no explicit override field — simplification, not a limitation anyone's hit yet). Collection visibility and per-item NSFW visibility are enforced as two separate checks: a public collection can contain NSFW items that still individually stay hidden from an ineligible viewer, verified directly rather than assumed. Public collections now show on `/u/[username]`; private ones don't, verified against a real public/private pair. Also added `/dashboard/uploads` and `/dashboard/favorites` in the same pass — pure reuse of infrastructure that already existed (Phase 6/9), not worth a separate phase, and leaving them stubbed next to a newly-real `/dashboard/collections` would've been an odd gap. `/dashboard/history` stays stubbed — "history" isn't defined anywhere yet (recently viewed? edit history?) and deserves its own decision, not a guess.
+
 ---
 
 ## 11. Gamification
