@@ -140,6 +140,10 @@ The pipeline above (steps 1–6) is live: `src/lib/media/validate.ts` (magic-byt
 
 **Step 3 (CSAM screening) is explicitly NOT implemented.** `src/lib/media/csam-screen.ts` is a clearly-labeled stub that lets every upload through and logs a loud warning every time it's called. This remains open item §20.3 — a real provider (Thorn Safer, NCMEC hash-matching, etc.) must be evaluated and wired in before this platform handles real, public uploads. Do not treat the current pipeline as safe for that.
 
+### Implemented (Phase 9)
+
+`/upload` is now the full flow: live file preview before submitting, title/description, the NSFW checkbox (which needs zero extra plumbing — Phase 5's visibility layer already gates on `Media.nsfw`, verified again here), real upload progress via `XMLHttpRequest` (`fetch` doesn't expose upload progress), and the same tag/character/series/category fields as Phase 7's post-upload editor. Rather than duplicate that logic, the find-or-create/sync code was pulled out to `src/lib/taxonomy/sync.ts`, shared by both the upload route (no permission check needed — you're creating your own media) and the post-upload edit action (which does check ownership/role). Verified end-to-end with a real multi-field upload (title, description, tags, character, series, category) and separately confirmed the NSFW checkbox correctly hides the item from anonymous viewers with no additional code.
+
 ---
 
 ## 7. Database Architecture
