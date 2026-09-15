@@ -8,6 +8,7 @@ import { MediaGrid, EmptyMediaState } from "@/components/media/MediaGrid";
 import { ChipLink } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
 import { FollowButton } from "@/components/profile/FollowButton";
+import { MessageButton } from "@/components/messaging/MessageButton";
 import { formatCount } from "@/lib/format";
 
 export async function generateMetadata({
@@ -81,7 +82,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
             Edit profile
           </Button>
         ) : (
-          <FollowButton targetUserId={user.id} isAuthenticated={Boolean(viewer.userId)} initialFollowing={following} />
+          <div className="flex items-center gap-3">
+            <FollowButton targetUserId={user.id} isAuthenticated={Boolean(viewer.userId)} initialFollowing={following} />
+            <MessageButton targetUserId={user.id} isAuthenticated={Boolean(viewer.userId)} />
+          </div>
         )}
       </div>
 

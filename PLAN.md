@@ -211,6 +211,12 @@ Counted via a `ViewEvent` log deduped per (user-or-anon-session, media, rolling 
 
 **Implemented (Phase 6):** dedup happens synchronously per-request against `ViewEvent` (not yet a separate aggregation job — at current scale a direct dedup-check-then-increment in `src/lib/media/views.ts` is simpler and correct; revisit if `ViewEvent` volume ever makes that check expensive) rather than a periodic background job. Anonymous dedup uses a random id in an httpOnly cookie (`mc_anon`, 1-year expiry) set by `/api/media/[id]/view`, a Route Handler triggered by a small client-side beacon on page load (Server Components can't set cookies, so this couldn't be done in the page itself). Self-views by the uploader don't count. **Likes and favorites** (`src/lib/media/actions.ts`) are real Server Actions with optimistic UI, verified end-to-end including the DB-level compound-unique key names. **Full-size viewing** is a click-to-open lightbox on `/i/[id]` (Escape or backdrop-click to close); download uses the real `ORIGINAL` variant. Comments are still Phase 11 — not touched here.
 
+### Messaging
+
+The original brief left "real-time from the start, or something simpler for v1" as an open question and it was never explicitly revisited on its own — **Phase 13 resolved it by applying the same answer already given for notifications**: polling, not WebSockets, for the same modest-infra reasoning.
+
+**Implemented (Phase 13).** `/messages` (conversation list, unread indicator) and `/messages/[id]` (real 1:1 conversations — the schema's `ConversationParticipant` is many-to-many so group chats are possible later without a migration, but v1 only ever creates 2-participant conversations). The open conversation polls `/api/messages/[id]` every 4s for new messages; sending is a Server Action, not the poll response, so your own messages appear immediately rather than waiting for the next tick. "Emojis" needed no dedicated feature — a plain text input already accepts them natively via the OS/browser emoji keyboard, so building a custom picker would've been unnecessary complexity for something already covered. **Blocking** is bidirectional-checked (either party blocking the other cuts off sending in both directions) and enforced in the Server Action itself, not just hidden in the UI — verified directly rather than assumed. A "Message" button on `/u/[username]` starts or resumes a conversation. Reporting reuses Phase 11's `submitReport` with the `USER` target type from the conversation header.
+
 ---
 
 ## 10. Collections
