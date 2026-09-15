@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications/create";
 
 const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])?$/;
 
@@ -69,5 +70,6 @@ export async function toggleFollow(targetUserId: string) {
   }
 
   await prisma.follow.create({ data: { followerId, followingId: targetUserId } });
+  await createNotification(targetUserId, "FOLLOW", { actorId: followerId, actorName: session.user.name }, followerId);
   return { ok: true as const, following: true };
 }

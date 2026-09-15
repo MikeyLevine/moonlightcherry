@@ -56,6 +56,7 @@ function ToggleButton({
 export function EngagementButtons({
   mediaId,
   isAuthenticated,
+  isOwnUpload = false,
   initialLiked,
   initialLikeCount,
   initialFavorited,
@@ -63,6 +64,7 @@ export function EngagementButtons({
 }: {
   mediaId: string;
   isAuthenticated: boolean;
+  isOwnUpload?: boolean;
   initialLiked: boolean;
   initialLikeCount: number;
   initialFavorited: boolean;
@@ -74,6 +76,7 @@ export function EngagementButtons({
   const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [favorited, setFavorited] = useState(initialFavorited);
   const [favoriteCount, setFavoriteCount] = useState(initialFavoriteCount);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function requireAuth(): boolean {
@@ -84,6 +87,7 @@ export function EngagementButtons({
 
   function handleLike() {
     if (!requireAuth()) return;
+    setError(null);
     const next = !liked;
     setLiked(next);
     setLikeCount((c) => c + (next ? 1 : -1));
@@ -95,6 +99,7 @@ export function EngagementButtons({
       } else {
         setLiked(!next);
         setLikeCount((c) => c - (next ? 1 : -1));
+        setError(result.error);
       }
     });
   }
@@ -118,14 +123,16 @@ export function EngagementButtons({
 
   return (
     <div className="flex items-center gap-3">
-      <ToggleButton
-        active={liked}
-        count={likeCount}
-        icon={<HeartIcon filled={liked} />}
-        label={liked ? "Unlike" : "Like"}
-        onToggle={handleLike}
-        disabled={isPending}
-      />
+      {!isOwnUpload ? (
+        <ToggleButton
+          active={liked}
+          count={likeCount}
+          icon={<HeartIcon filled={liked} />}
+          label={liked ? "Unlike" : "Like"}
+          onToggle={handleLike}
+          disabled={isPending}
+        />
+      ) : null}
       <ToggleButton
         active={favorited}
         count={favoriteCount}
@@ -134,6 +141,7 @@ export function EngagementButtons({
         onToggle={handleFavorite}
         disabled={isPending}
       />
+      {error ? <span className="text-sm text-ember">{error}</span> : null}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications/create";
 
 export async function toggleLike(mediaId: string) {
   const session = await auth();
@@ -20,10 +21,20 @@ export async function toggleLike(mediaId: string) {
     return { ok: true as const, active: false, count: media.likeCount };
   }
 
+  const target = await prisma.media.findUnique({ where: { id: mediaId }, select: { uploaderId: true } });
+  if (target?.uploaderId === userId) {
+    return { ok: false as const, error: "You can't like your own upload." };
+  }
+
   const [, media] = await prisma.$transaction([
     prisma.like.create({ data: { userId, mediaId } }),
     prisma.media.update({ where: { id: mediaId }, data: { likeCount: { increment: 1 } }, select: { likeCount: true } }),
   ]);
+
+  if (target?.uploaderId) {
+    await createNotification(target.uploaderId, "LIKE", { actorId: userId, actorName: session.user.name, mediaId }, userId);
+  }
+
   return { ok: true as const, active: true, count: media.likeCount };
 }
 

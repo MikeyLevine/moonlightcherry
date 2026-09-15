@@ -194,8 +194,12 @@ Cascade behavior first pass: content-authoring relations (`Media.uploaderId`, `C
 ### Comments
 Single-level replies (comment → replies, no infinite nesting) to keep threads readable and UI simple — flag if you want deeper nesting. Mentions (`@username`), likes, timestamps, report action, moderation (edit/remove by mod, own-delete by author).
 
+**Implemented (Phase 11):** `src/lib/comments/` — posting, single-level replies (replying to a reply attaches to its original thread rather than erroring or nesting deeper, verified directly), `@username` mentions (linkified, and each mention fires a notification), comment likes, and own-delete. Mod-level remove-others'-comments waits for the moderation UI (Phase 15) — author-only delete is real today. **Reporting** (`src/lib/moderation/actions.ts`) is real for media (and the same action already supports comment/user/message target types, just not wired to a button on those surfaces yet) — writes a real `Report` row; nothing reviews it yet (Phase 15/16).
+
 ### Following
 `Follow` relationship powers: notifications on new upload from followed users (opt-out-able), and creator discovery. **Full activity feed is deferred** alongside gamification (§11) — the relationship and its notification hook ship in the core community phase, but a dedicated `/dashboard` "activity feed" aggregation view is a later-phase feature.
+
+**Implemented (Phase 11):** the notification hook itself. `src/lib/media/process.ts` fans out a `NEW_UPLOAD` notification to every follower once a media item publishes — verified through the real pipeline (upload → worker → publish → follower notified), not simulated. `FOLLOW` notifications fire on follow (not unfollow). Also fixed a real bug found while wiring the `LIKE` notification: **uploaders could like their own media** — blocked now (`src/lib/media/actions.ts`), both for trending-fairness and because a self-notification made no sense to suppress silently.
 
 ### Notifications
 Likes, comments, replies, mentions, new followers, moderation events (your content was removed/warned), system announcements. **Polling-based** delivery for v1 (client polls an unread-count/list endpoint on an interval + on navigation) rather than WebSockets — matches the modest-infra constraint and avoids a new stateful realtime service.

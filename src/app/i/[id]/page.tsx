@@ -15,6 +15,9 @@ import { ViewBeacon } from "@/components/media/ViewBeacon";
 import { AssociationEditor } from "@/components/media/AssociationEditor";
 import { AddToCollectionButton } from "@/components/collections/AddToCollectionButton";
 import { getViewerCollectionsWithMembership } from "@/lib/collections/queries";
+import { CommentSection } from "@/components/comments/CommentSection";
+import { getCommentsForMedia } from "@/lib/comments/queries";
+import { ReportButton } from "@/components/moderation/ReportButton";
 import { ChipLink } from "@/components/ui/Chip";
 import { buttonBaseClasses, buttonVariantClasses } from "@/components/ui/Button";
 import { ProcessingPoller } from "./ProcessingPoller";
@@ -45,6 +48,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
   const isOwnerOrEditor = canEditMedia(viewer, media.uploaderId);
   const allCategories = isOwnerOrEditor ? await getPopularCategories() : [];
   const viewerCollections = viewer.userId ? await getViewerCollectionsWithMembership(viewer.userId, media.id) : [];
+  const comments = await getCommentsForMedia(media.id, viewer.userId);
 
   const small = media.variants.find((v) => v.kind === "SMALL");
   const medium = media.variants.find((v) => v.kind === "MEDIUM");
@@ -102,6 +106,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
           <EngagementButtons
             mediaId={media.id}
             isAuthenticated={Boolean(viewer.userId)}
+            isOwnUpload={viewer.userId === media.uploaderId}
             initialLiked={engagement.liked}
             initialLikeCount={media.likeCount}
             initialFavorited={engagement.favorited}
@@ -125,9 +130,14 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      <p className="mt-4 text-sm text-ash">
-        {media.width}×{media.height} · {Math.round(media.fileSize / 1024)}KB
-      </p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ash">
+          {media.width}×{media.height} · {Math.round(media.fileSize / 1024)}KB
+        </p>
+        {!isOwnerOrEditor ? (
+          <ReportButton targetType="MEDIA" targetId={media.id} isAuthenticated={Boolean(viewer.userId)} />
+        ) : null}
+      </div>
 
       {media.categories.length > 0 || media.tags.length > 0 || media.characters.length > 0 || media.series.length > 0 ? (
         <div className="mt-5 flex flex-wrap gap-2">
@@ -167,6 +177,13 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
           />
         </div>
       ) : null}
+
+      <CommentSection
+        mediaId={media.id}
+        isAuthenticated={Boolean(viewer.userId)}
+        viewerId={viewer.userId}
+        initialComments={comments}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type { MediaVariantKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMediaFileUrl, putMediaFile, readMediaFile } from "@/lib/media/storage";
 import { screenForCsam } from "@/lib/media/csam-screen";
+import { createNotifications } from "@/lib/notifications/create";
 
 const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -138,4 +139,20 @@ export async function processMedia(mediaId: string): Promise<void> {
   });
 
   await prisma.media.update({ where: { id: media.id }, data: { status: "PUBLISHED" } });
+
+  if (media.uploaderId) {
+    const followers = await prisma.follow.findMany({
+      where: { followingId: media.uploaderId },
+      select: { followerId: true },
+    });
+    if (followers.length > 0) {
+      const uploader = await prisma.user.findUnique({ where: { id: media.uploaderId }, select: { name: true } });
+      await createNotifications(
+        followers.map((f) => f.followerId),
+        "NEW_UPLOAD",
+        { actorId: media.uploaderId, actorName: uploader?.name, mediaId: media.id },
+        media.uploaderId
+      );
+    }
+  }
 }
