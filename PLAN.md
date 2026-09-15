@@ -177,6 +177,8 @@ Cascade behavior first pass: content-authoring relations (`Media.uploaderId`, `C
 - Filters: newest, oldest, most liked, most viewed, trending, category, tag(s), character, series, uploader, NSFW-eligible-only.
 - Revisit a dedicated engine (Meilisearch/Typesense) only if query volume or relevance quality genuinely outgrows Postgres — designed so the search API's internal contract doesn't leak Postgres-specific query shape into the frontend, keeping a future swap contained to the backend.
 
+**Implemented (Phase 7), simpler than the target above:** `/search` uses plain `ILIKE` (Prisma `contains`, case-insensitive) against `Media.title`, uploader name/username, and `Tag`/`Character`/`Series` names — no `tsvector` columns or `pg_trgm` indexes yet. Correct results at today's scale, but a full table scan per query rather than an indexed lookup. Add `pg_trgm` + GIN indexes (or the full `tsvector` approach above) before this matters for real traffic — noted here rather than silently left as a surprise later. Category/tag/character/series/sort filtering all work today via `/gallery`'s query params (Phase 5) and the taxonomy detail pages (this phase); `/search` itself doesn't yet expose those as combinable filters in one UI — right now it's a single query box across all entity types.
+
 ---
 
 ## 9. Community Features
@@ -236,6 +238,8 @@ Anti-abuse baseline:
 - Moderator actions: approve, reject, remove, edit metadata, warn, mute, timeout, restrict, suspend, ban — scoped by the permission matrix (§2: Mods cannot act on Admin/Owner accounts).
 - Every action writes an `AuditLog` + a `ModerationAction` row visible in the target user's moderation history (for Admin/Owner review) and usable as evidence in appeals.
 - Tag/Character/Series moderation: user suggestions queue (auto-approved for Trusted Uploader+), Mod+ can create/edit/merge/rename directly, with merges reassigning all `Media*` join rows and redirecting the old page.
+
+**Deliberate simplification (Phase 7):** tag/character/series creation is currently **direct for every authenticated user**, not queued — when an uploader tags their own media with a new name, the `Tag`/`Character`/`Series` row is created immediately (find-or-create by slug via `src/lib/taxonomy/actions.ts`), not routed through `TagSuggestion`/`CharacterSuggestion`/`SeriesSuggestion`. Those tables stay in the schema, reserved, but building the queued-pending path now would create suggestions nothing can ever approve, since the admin moderation queue doesn't exist until Phase 16 — a stuck queue is arguably more "fake" than direct creation. **This needs to be revisited once Phase 16 ships**: switch regular `User` submissions to the suggestion tables, keep direct creation for Trusted Uploader+, matching the permission matrix above.
 
 ---
 

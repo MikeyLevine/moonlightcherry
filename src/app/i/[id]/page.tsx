@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
-import { getViewerContext, getVisibleMediaById, getViewerEngagement } from "@/lib/media/query";
+import {
+  getViewerContext,
+  getVisibleMediaById,
+  getViewerEngagement,
+  getPopularCategories,
+  canEditMedia,
+} from "@/lib/media/query";
 import { formatCount, formatRelativeTime } from "@/lib/format";
 import { EngagementButtons } from "@/components/media/EngagementButtons";
 import { ShareButton } from "@/components/media/ShareButton";
 import { MediaLightbox } from "@/components/media/MediaLightbox";
 import { ViewBeacon } from "@/components/media/ViewBeacon";
+import { AssociationEditor } from "@/components/media/AssociationEditor";
+import { ChipLink } from "@/components/ui/Chip";
 import { buttonBaseClasses, buttonVariantClasses } from "@/components/ui/Button";
 import { ProcessingPoller } from "./ProcessingPoller";
 
@@ -31,6 +39,8 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
   }
 
   const engagement = await getViewerEngagement(media.id, viewer.userId);
+  const isOwnerOrEditor = canEditMedia(viewer, media.uploaderId);
+  const allCategories = isOwnerOrEditor ? await getPopularCategories() : [];
 
   const small = media.variants.find((v) => v.kind === "SMALL");
   const medium = media.variants.find((v) => v.kind === "MEDIUM");
@@ -102,6 +112,45 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
       <p className="mt-4 text-sm text-ash">
         {media.width}×{media.height} · {Math.round(media.fileSize / 1024)}KB
       </p>
+
+      {media.categories.length > 0 || media.tags.length > 0 || media.characters.length > 0 || media.series.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {media.series.map((s) => (
+            <ChipLink key={s.seriesId} href={`/anime/${s.series.slug}`}>
+              {s.series.name}
+            </ChipLink>
+          ))}
+          {media.characters.map((c) => (
+            <ChipLink key={c.characterId} href={`/characters/${c.character.slug}`}>
+              {c.character.name}
+            </ChipLink>
+          ))}
+          {media.categories.map((c) => (
+            <ChipLink key={c.categoryId} href={`/gallery?category=${c.category.slug}`}>
+              {c.category.name}
+            </ChipLink>
+          ))}
+          {media.tags.map((t) => (
+            <ChipLink key={t.tagId} href={`/tags/${t.tag.slug}`}>
+              #{t.tag.name}
+            </ChipLink>
+          ))}
+        </div>
+      ) : null}
+
+      {isOwnerOrEditor ? (
+        <div className="mt-6">
+          <AssociationEditor
+            mediaId={media.id}
+            categories={allCategories.map((c) => ({ id: c.id, name: c.name }))}
+            initialCategoryIds={media.categories.map((c) => c.categoryId)}
+            initialTags={media.tags.map((t) => t.tag.name).join(", ")}
+            initialCharacter={media.characters[0]?.character.name ?? ""}
+            initialSeries={media.series[0]?.series.name ?? ""}
+            initialSeriesType={media.series[0]?.series.type ?? "ANIME"}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

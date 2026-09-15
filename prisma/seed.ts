@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { slugify } from "../src/lib/slugify";
 
 const prisma = new PrismaClient();
 
@@ -15,13 +16,6 @@ const CATEGORIES = [
   "Memes",
   "Other",
 ];
-
-function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 const SITE_SETTINGS: { key: string; value: unknown }[] = [
   { key: "upload.maxImageBytes", value: 20 * 1024 * 1024 },

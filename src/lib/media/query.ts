@@ -1,11 +1,14 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 export type ViewerContext = {
   userId: string | null;
   canSeeNsfw: boolean;
+  role: Role | null;
 };
+
+const EDITOR_ROLES: Role[] = ["MODERATOR", "ADMINISTRATOR", "OWNER"];
 
 /**
  * The one place that decides whether the current request can see NSFW media.
@@ -17,7 +20,14 @@ export async function getViewerContext(): Promise<ViewerContext> {
   return {
     userId: session?.user?.id ?? null,
     canSeeNsfw: Boolean(session?.user?.nsfwEnabled),
+    role: session?.user?.role ?? null,
   };
+}
+
+export function canEditMedia(viewer: ViewerContext, uploaderId: string | null): boolean {
+  if (!viewer.userId) return false;
+  if (viewer.userId === uploaderId) return true;
+  return viewer.role !== null && EDITOR_ROLES.includes(viewer.role);
 }
 
 /** The shared visibility filter: published, not soft-deleted, and NSFW-gated. */
@@ -52,17 +62,47 @@ type ListOptions = {
   take?: number;
   cursor?: string | null;
   categorySlug?: string | null;
+  tagSlug?: string | null;
+  characterSlug?: string | null;
+  seriesSlug?: string | null;
+  uploaderId?: string | null;
+  /** Matches title OR uploader name/username — covers "search by uploader"
+   * without needing profile pages (Phase 8) to exist yet. */
+  searchQuery?: string | null;
 };
 
 export async function getMediaPage(
   sort: MediaSort,
   options: ListOptions
 ): Promise<{ items: MediaCard[]; nextCursor: string | null }> {
-  const { viewer, take = 24, cursor = null, categorySlug = null } = options;
+  const {
+    viewer,
+    take = 24,
+    cursor = null,
+    categorySlug = null,
+    tagSlug = null,
+    characterSlug = null,
+    seriesSlug = null,
+    uploaderId = null,
+    searchQuery = null,
+  } = options;
 
   const where: Prisma.MediaWhereInput = {
     ...visibleMediaWhere(viewer),
     ...(categorySlug ? { categories: { some: { category: { slug: categorySlug } } } } : {}),
+    ...(tagSlug ? { tags: { some: { tag: { slug: tagSlug } } } } : {}),
+    ...(characterSlug ? { characters: { some: { character: { slug: characterSlug } } } } : {}),
+    ...(seriesSlug ? { series: { some: { series: { slug: seriesSlug } } } } : {}),
+    ...(uploaderId ? { uploaderId } : {}),
+    ...(searchQuery
+      ? {
+          OR: [
+            { title: { contains: searchQuery, mode: "insensitive" } },
+            { uploader: { name: { contains: searchQuery, mode: "insensitive" } } },
+            { uploader: { username: { contains: searchQuery, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
   };
 
   const orderBy: Prisma.MediaOrderByWithRelationInput[] =
@@ -137,6 +177,10 @@ export async function getPopularCategories() {
 const DETAIL_INCLUDE = {
   uploader: { select: { id: true, name: true, username: true, image: true } },
   variants: true,
+  categories: { include: { category: true } },
+  tags: { include: { tag: true } },
+  characters: { include: { character: true } },
+  series: { include: { series: true } },
 } satisfies Prisma.MediaInclude;
 
 export type MediaDetail = Prisma.MediaGetPayload<{ include: typeof DETAIL_INCLUDE }>;
