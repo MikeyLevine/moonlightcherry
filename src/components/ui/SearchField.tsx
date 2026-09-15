@@ -1,10 +1,12 @@
 type SearchFieldProps = {
   id: string;
+  name?: string;
   placeholder: string;
+  defaultValue?: string;
   className?: string;
 };
 
-export function SearchField({ id, placeholder, className = "" }: SearchFieldProps) {
+export function SearchField({ id, name, placeholder, defaultValue, className = "" }: SearchFieldProps) {
   return (
     <div
       className={`flex items-center gap-2.5 rounded-md border border-white/15 bg-charcoal/80 px-4 py-[13px] backdrop-blur ${className}`}
@@ -25,9 +27,10 @@ export function SearchField({ id, placeholder, className = "" }: SearchFieldProp
       </label>
       <input
         id={id}
-        name={id}
+        name={name ?? id}
         type="text"
         placeholder={placeholder}
+        defaultValue={defaultValue}
         className="w-full bg-transparent text-sm text-moonlight placeholder:text-ash focus:outline-none"
       />
     </div>

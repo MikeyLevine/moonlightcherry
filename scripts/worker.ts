@@ -2,7 +2,10 @@ import "dotenv/config";
 import { PgBoss } from "pg-boss";
 import { QUEUE_PROCESS_MEDIA } from "../src/lib/media/queue";
 import { processMedia } from "../src/lib/media/process";
+import { recomputeTrendingScores } from "../src/lib/media/trending";
 import { prisma } from "../src/lib/prisma";
+
+const QUEUE_RECOMPUTE_TRENDING = "recompute-trending";
 
 async function main() {
   const boss = new PgBoss({ connectionString: process.env.DATABASE_URL });
@@ -11,6 +14,7 @@ async function main() {
 
   await boss.start();
   await boss.createQueue(QUEUE_PROCESS_MEDIA);
+  await boss.createQueue(QUEUE_RECOMPUTE_TRENDING);
 
   await boss.work<{ mediaId: string }>(QUEUE_PROCESS_MEDIA, async ([job]) => {
     console.log(`[worker] processing media ${job.data.mediaId}`);
@@ -22,6 +26,16 @@ async function main() {
       throw err;
     }
   });
+
+  await boss.work(QUEUE_RECOMPUTE_TRENDING, async () => {
+    await recomputeTrendingScores();
+    console.log("[worker] recomputed trending scores");
+  });
+
+  // Every 5 minutes, per the plan's "recomputed periodically, not on every request".
+  await boss.schedule(QUEUE_RECOMPUTE_TRENDING, "*/5 * * * *");
+  // Run once immediately on boot so scores aren't all zero until the first tick.
+  await boss.send(QUEUE_RECOMPUTE_TRENDING, {});
 
   console.log("[worker] listening for media processing jobs");
 

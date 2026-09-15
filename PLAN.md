@@ -80,6 +80,8 @@ All of the above must be enforced **server-side** on every API route/server acti
   - This is a compliance/legal area — **flagged explicitly in §20**, recommend you loop in whatever legal counsel/compliance resource you have before NSFW goes live, independent of anything I can architect.
 - Age gate copy/UX (interstitial vs. inline settings toggle) — to be designed in the UI/UX phase.
 
+**Implemented (Phase 5):** the shared layer is `src/lib/media/query.ts` — `getViewerContext()` + `visibleMediaWhere()`, used by every list (homepage, `/gallery`, `/api/media`) and by `getVisibleMediaById()` for the detail page. Verified directly: an anonymous/non-opted-in viewer gets 404 on a direct NSFW media URL and never sees it in any list; a viewer with `nsfwEnabled: true` sees it in both. The `/settings` opt-in toggle itself doesn't exist yet (no phase has built it), so this path is real but currently unreachable through the UI — only flippable directly in the database.
+
 ---
 
 ## 5. Media Architecture
@@ -219,6 +221,8 @@ Anti-abuse baseline:
 - Minimum account age or trust level required for an engagement to count toward *trending* weight (still counts as a real like/favorite for the user, just not for ranking) — blunts brand-new throwaway-account brigading.
 - Anomalous velocity (e.g. huge like spike from a narrow IP range) flags the media for moderator review rather than silently boosting it.
 - Exact weights/gravity are tuning parameters, not architecture — start conservative and adjust from real data.
+
+**Implemented (Phase 5):** `src/lib/media/trending.ts` computes exactly this formula (starting weights: like=1, favorite=2, comment=3, gravity=1.5 — still just a starting point per §20.10) via a raw SQL bulk update; `scripts/worker.ts` schedules it every 5 minutes via `pg-boss`, plus once on worker boot. The anti-abuse baseline above (rate limits, view dedup, trust-gated weighting, anomaly detection) is **not implemented** — there's no abuse to guard against yet since there's no real traffic, but this needs to land before the trending list is exposed to real users at scale, not left for "later" indefinitely.
 
 ---
 

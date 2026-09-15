@@ -1,15 +1,13 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getViewerContext, getVisibleMediaById } from "@/lib/media/query";
 import { ProcessingPoller } from "./ProcessingPoller";
 
 export default async function MediaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const media = await prisma.media.findUnique({
-    where: { id },
-    include: { variants: true, uploader: true },
-  });
+  const viewer = await getViewerContext();
+  const media = await getVisibleMediaById(id, viewer);
 
-  if (!media || media.deletedAt || media.status === "REMOVED") {
+  if (!media) {
     notFound();
   }
 
@@ -26,7 +24,10 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const display = media.variants.find((v) => v.kind === "MEDIUM") ?? media.variants.find((v) => v.kind === "SMALL");
+  const display =
+    media.variants.find((v) => v.kind === "MEDIUM") ??
+    media.variants.find((v) => v.kind === "SMALL") ??
+    media.variants.find((v) => v.kind === "POSTER");
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-10 sm:px-8">
