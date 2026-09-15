@@ -2,10 +2,10 @@ import Link from "next/link";
 
 type Variant = "primary" | "ghost" | "text";
 
-const base =
+export const buttonBaseClasses =
   "inline-flex items-center justify-center gap-2 rounded-sm text-sm font-bold px-[18px] py-[9px] transition-colors whitespace-nowrap";
 
-const variantClasses: Record<Variant, string> = {
+export const buttonVariantClasses: Record<Variant, string> = {
   primary: "bg-cherry text-on-cherry hover:bg-ember disabled:opacity-40 disabled:pointer-events-none",
   ghost:
     "bg-transparent text-moonlight border border-white/15 hover:border-moonlight disabled:opacity-40 disabled:pointer-events-none",
@@ -31,7 +31,7 @@ export function Button({
   type = "button",
   disabled = false,
 }: ButtonProps) {
-  const classes = `${base} ${variantClasses[variant]} ${className}`;
+  const classes = `${buttonBaseClasses} ${buttonVariantClasses[variant]} ${className}`;
 
   if (href) {
     return (

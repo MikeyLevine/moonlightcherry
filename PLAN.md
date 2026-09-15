@@ -193,6 +193,8 @@ Likes, comments, replies, mentions, new followers, moderation events (your conte
 ### Views
 Counted via a `ViewEvent` log deduped per (user-or-anon-session, media, rolling 24h window) rather than incrementing on every request, aggregated into `Media.viewCount` by a background job — prevents refresh-spam view inflation and keeps the write path cheap.
 
+**Implemented (Phase 6):** dedup happens synchronously per-request against `ViewEvent` (not yet a separate aggregation job — at current scale a direct dedup-check-then-increment in `src/lib/media/views.ts` is simpler and correct; revisit if `ViewEvent` volume ever makes that check expensive) rather than a periodic background job. Anonymous dedup uses a random id in an httpOnly cookie (`mc_anon`, 1-year expiry) set by `/api/media/[id]/view`, a Route Handler triggered by a small client-side beacon on page load (Server Components can't set cookies, so this couldn't be done in the page itself). Self-views by the uploader don't count. **Likes and favorites** (`src/lib/media/actions.ts`) are real Server Actions with optimistic UI, verified end-to-end including the DB-level compound-unique key names. **Full-size viewing** is a click-to-open lightbox on `/i/[id]` (Escape or backdrop-click to close); download uses the real `ORIGINAL` variant. Comments are still Phase 11 — not touched here.
+
 ---
 
 ## 10. Collections

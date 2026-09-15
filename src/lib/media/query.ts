@@ -108,6 +108,20 @@ export async function getRandomMediaId(viewer: ViewerContext): Promise<string | 
   return row?.id ?? null;
 }
 
+export async function getViewerEngagement(
+  mediaId: string,
+  userId: string | null
+): Promise<{ liked: boolean; favorited: boolean }> {
+  if (!userId) return { liked: false, favorited: false };
+
+  const [like, favorite] = await Promise.all([
+    prisma.like.findUnique({ where: { userId_mediaId: { userId, mediaId } } }),
+    prisma.favorite.findUnique({ where: { userId_mediaId: { userId, mediaId } } }),
+  ]);
+
+  return { liked: Boolean(like), favorited: Boolean(favorite) };
+}
+
 export async function getPopularCategories() {
   return prisma.category.findMany({
     orderBy: { name: "asc" },
