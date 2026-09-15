@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// Enums
+// ============================================================
+
 enum Role {
   USER
   TRUSTED_UPLOADER
@@ -14,6 +18,92 @@ enum Role {
   ADMINISTRATOR
   OWNER
 }
+
+enum MediaStatus {
+  PROCESSING
+  PUBLISHED
+  REMOVED
+}
+
+enum MediaVariantKind {
+  THUMBNAIL
+  SMALL
+  MEDIUM
+  ORIGINAL
+  POSTER
+  ANIMATED_PREVIEW
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SeriesType {
+  ANIME
+  MANGA
+  OTHER
+}
+
+enum CollectionVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  REPLY
+  MENTION
+  FOLLOW
+  MODERATION
+  SYSTEM
+}
+
+enum ReportTargetType {
+  MEDIA
+  COMMENT
+  USER
+  MESSAGE
+}
+
+enum ReportCategory {
+  ILLEGAL
+  HARASSMENT
+  SPAM
+  COPYRIGHT
+  METADATA
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum ModerationActionType {
+  APPROVE
+  REJECT
+  REMOVE
+  EDIT_METADATA
+  WARN
+  MUTE
+  TIMEOUT
+  RESTRICT
+  SUSPEND
+  BAN
+  ROLE_CHANGE
+  TAG_MERGE
+  CHARACTER_MERGE
+  SERIES_MERGE
+}
+
+// ============================================================
+// Auth (Phase 2)
+// ============================================================
 
 model User {
   id            String    @id @default(cuid())
@@ -26,11 +116,42 @@ model User {
   role        Role    @default(USER)
   nsfwEnabled Boolean @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   accounts Account[]
   sessions Session[]
+
+  media       Media[]
+  likes       Like[]
+  favorites   Favorite[]
+  viewEvents  ViewEvent[]
+  comments    Comment[]
+  commentLikes CommentLike[]
+  collections Collection[]
+
+  followedBy Follow[] @relation("Following")
+  following  Follow[] @relation("Follower")
+
+  notifications Notification[]
+
+  conversations       ConversationParticipant[]
+  sentMessages         Message[]
+  blocksInitiated      Block[]                    @relation("Blocker")
+  blocksReceived       Block[]                    @relation("Blocked")
+
+  reportsFiled     Report[]           @relation("Reporter")
+  moderationActions ModerationAction[] @relation("ModerationActor")
+  auditLogs        AuditLog[]         @relation("AuditActor")
+
+  tagSuggestions       TagSuggestion[]
+  characterSuggestions CharacterSuggestion[]
+  seriesSuggestions    SeriesSuggestion[]
+
+  xp     UserXP?
+  badges UserBadge[]
+  achievements UserAchievement[]
 
   @@map("users")
 }
@@ -74,4 +195,600 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ============================================================
+// Media
+// ============================================================
+
+model Media {
+  id           String      @id @default(cuid())
+  uploaderId   String?
+  title        String?
+  description  String?     @db.Text
+  status       MediaStatus @default(PROCESSING)
+  nsfw         Boolean     @default(false)
+
+  mimeType String
+  width    Int
+  height   Int
+  fileSize Int
+  checksumSha256 String @unique
+
+  likeCount     Int   @default(0)
+  viewCount     Int   @default(0)
+  favoriteCount Int   @default(0)
+  commentCount  Int   @default(0)
+  trendingScore Float @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  uploader User? @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  variants   MediaVariant[]
+  metadata   MediaMetadata?
+  categories MediaCategory[]
+  tags       MediaTag[]
+  characters MediaCharacter[]
+  series     MediaSeries[]
+
+  likes           Like[]
+  favorites       Favorite[]
+  views           ViewEvent[]
+  comments        Comment[]
+  collectionItems CollectionMedia[]
+
+  @@index([nsfw, deletedAt, createdAt])
+  @@index([status])
+  @@index([uploaderId])
+  @@index([trendingScore])
+  @@map("media")
+}
+
+model MediaVariant {
+  id       String           @id @default(cuid())
+  mediaId  String
+  kind     MediaVariantKind
+  url      String
+  width    Int
+  height   Int
+  format   String
+  fileSize Int
+
+  createdAt DateTime @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, kind])
+  @@map("media_variants")
+}
+
+model MediaMetadata {
+  mediaId          String  @id
+  originalFilename String
+  exifStripped     Boolean @default(true)
+  frameCount       Int?
+  durationMs       Int?
+  colorProfile     String?
+
+  createdAt DateTime @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@map("media_metadata")
+}
+
+// ============================================================
+// Categories
+// ============================================================
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  media MediaCategory[]
+
+  @@map("categories")
+}
+
+model MediaCategory {
+  mediaId    String
+  categoryId String
+
+  media    Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, categoryId])
+  @@index([categoryId])
+  @@map("media_categories")
+}
+
+// ============================================================
+// Tags
+// ============================================================
+
+model Tag {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  slug       String   @unique
+  usageCount Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  media MediaTag[]
+
+  @@map("tags")
+}
+
+model MediaTag {
+  mediaId String
+  tagId   String
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, tagId])
+  @@index([tagId])
+  @@map("media_tags")
+}
+
+model TagSuggestion {
+  id             String           @id @default(cuid())
+  name           String
+  status         SuggestionStatus @default(PENDING)
+  submittedById  String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  submittedBy User? @relation(fields: [submittedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("tag_suggestions")
+}
+
+// ============================================================
+// Characters
+// ============================================================
+
+model Character {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  avatarUrl   String?
+  description String?  @db.Text
+  seriesId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  series Series?          @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  media  MediaCharacter[]
+
+  @@index([seriesId])
+  @@map("characters")
+}
+
+model MediaCharacter {
+  mediaId     String
+  characterId String
+
+  media     Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, characterId])
+  @@index([characterId])
+  @@map("media_characters")
+}
+
+model CharacterSuggestion {
+  id            String           @id @default(cuid())
+  name          String
+  seriesId      String?
+  status        SuggestionStatus @default(PENDING)
+  submittedById String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  submittedBy User? @relation(fields: [submittedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("character_suggestions")
+}
+
+// ============================================================
+// Series (anime/manga)
+// ============================================================
+
+model Series {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  type        SeriesType @default(ANIME)
+  description String?    @db.Text
+  coverUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  characters Character[]
+  media      MediaSeries[]
+
+  @@map("series")
+}
+
+model MediaSeries {
+  mediaId  String
+  seriesId String
+
+  media  Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, seriesId])
+  @@index([seriesId])
+  @@map("media_series")
+}
+
+model SeriesSuggestion {
+  id            String           @id @default(cuid())
+  name          String
+  type          SeriesType       @default(ANIME)
+  status        SuggestionStatus @default(PENDING)
+  submittedById String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  submittedBy User? @relation(fields: [submittedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("series_suggestions")
+}
+
+// ============================================================
+// Collections
+// ============================================================
+
+model Collection {
+  id          String               @id @default(cuid())
+  ownerId     String
+  name        String
+  description String?              @db.Text
+  visibility  CollectionVisibility @default(PUBLIC)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  owner User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items CollectionMedia[]
+
+  @@index([ownerId])
+  @@map("collections")
+}
+
+model CollectionMedia {
+  collectionId String
+  mediaId      String
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  media      Media      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, mediaId])
+  @@index([mediaId])
+  @@map("collection_media")
+}
+
+// ============================================================
+// Engagement
+// ============================================================
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  mediaId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mediaId])
+  @@index([mediaId])
+  @@map("likes")
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  mediaId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mediaId])
+  @@index([mediaId])
+  @@map("favorites")
+}
+
+model ViewEvent {
+  id          String   @id @default(cuid())
+  mediaId     String
+  userId      String?
+  anonHash    String?
+  createdAt   DateTime @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([mediaId, userId, createdAt])
+  @@index([mediaId, anonHash, createdAt])
+  @@map("view_events")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  mediaId   String
+  authorId  String?
+  parentId  String?
+  content   String    @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  media  Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  author User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  parent Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+  likes  CommentLike[]
+
+  @@index([mediaId, deletedAt, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_likes")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  payload   Json
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+// ============================================================
+// Messaging
+// ============================================================
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String?
+  content        String    @db.Text
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocks")
+}
+
+// ============================================================
+// Moderation
+// ============================================================
+
+model Report {
+  id         String           @id @default(cuid())
+  reporterId String?
+  targetType ReportTargetType
+  targetId   String
+  category   ReportCategory
+  details    String?          @db.Text
+  status     ReportStatus     @default(OPEN)
+  assignedToId String?
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  reporter User? @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@map("reports")
+}
+
+model ModerationAction {
+  id           String                @id @default(cuid())
+  actorId      String?
+  action       ModerationActionType
+  targetUserId String?
+  targetType   String?
+  targetId     String?
+  reason       String?               @db.Text
+  metadata     Json?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation("ModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([targetUserId, createdAt])
+  @@index([actorId])
+  @@map("moderation_actions")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// Gamification (schema reserved, no logic yet — Phase 11)
+// ============================================================
+
+model UserXP {
+  userId    String   @id
+  totalXp   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_xp")
+}
+
+model UserLevel {
+  level      Int    @id
+  xpRequired Int
+  title      String
+
+  @@map("user_levels")
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String?
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@map("user_achievements")
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String?
+
+  users UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+  @@map("user_badges")
+}
+
+// ============================================================
+// Site configuration
+// ============================================================
+
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
 }

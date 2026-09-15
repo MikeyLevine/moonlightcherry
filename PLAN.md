@@ -132,7 +132,9 @@ Given the existing stack (Docker Compose, Postgres, no Redis), background jobs r
 
 ## 7. Database Architecture
 
-Relational, PostgreSQL. Not final DDL — this is the entity/relationship shape to refine in the DB phase.
+Relational, PostgreSQL. **Implemented** as of Phase 3 — see `prisma/schema.prisma` for the authoritative, current shape (41 tables). Still refinable as real usage patterns emerge; what follows is the design intent behind that schema, not a duplicate source of truth.
+
+Cascade behavior first pass: content-authoring relations (`Media.uploaderId`, `Comment.authorId`, `Message.senderId`, `Report.reporterId`, `ModerationAction.actorId`, `AuditLog.actorId`, tag/character/series suggestion submitters) are nullable with `onDelete: SetNull`, so hard-deleting a user preserves the content/history instead of cascading destruction through it. Pure ownership/activity records with no standalone meaning (`Like`, `Favorite`, `Follow`, `CommentLike`, `Block`, `Session`, `Account`, `Collection` + its items) cascade-delete with the user. Categories seeded from the initial list; `SiteSetting` seeded with the approved upload-limit/storage-threshold/retention defaults from §5/§7 so they're admin-editable from day one instead of hardcoded.
 
 ### Core entities
 - `User`, `Account` (OAuth identities), `Session`
