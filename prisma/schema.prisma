@@ -113,6 +113,9 @@ model User {
   image         String?
 
   username    String? @unique
+  bio         String? @db.Text
+  websiteUrl  String?
+  twitterHandle String?
   role        Role    @default(USER)
   nsfwEnabled Boolean @default(false)
 

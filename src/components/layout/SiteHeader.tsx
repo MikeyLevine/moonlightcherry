@@ -17,6 +17,7 @@ const NAV_LINKS = [
 type SiteHeaderUser = {
   name?: string | null;
   image?: string | null;
+  username?: string | null;
 } | null;
 
 export function SiteHeader({ user = null }: { user?: SiteHeaderUser }) {
@@ -47,16 +48,15 @@ export function SiteHeader({ user = null }: { user?: SiteHeaderUser }) {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              {user.image ? (
-                <Image
-                  src={user.image}
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="hidden rounded-full sm:block"
-                />
-              ) : null}
-              <span className="hidden text-sm text-ash sm:inline">{user.name}</span>
+              <Link
+                href={user.username ? `/u/${user.username}` : "/settings"}
+                className="hidden items-center gap-2 sm:flex"
+              >
+                {user.image ? (
+                  <Image src={user.image} alt="" width={28} height={28} className="rounded-full" />
+                ) : null}
+                <span className="text-sm text-ash hover:text-moonlight">{user.name}</span>
+              </Link>
               <form action={doSignOut}>
                 <Button variant="text" type="submit">
                   Sign out

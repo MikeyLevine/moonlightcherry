@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import {
   getViewerContext,
   getVisibleMediaById,
@@ -82,8 +83,15 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
             ) : null}
           </div>
           <p className="mt-1 text-sm text-ash">
-            Uploaded by {media.uploader?.name ?? "a deleted user"} · {formatRelativeTime(media.createdAt)} ·{" "}
-            {formatCount(media.viewCount)} views
+            Uploaded by{" "}
+            {media.uploader?.username ? (
+              <Link href={`/u/${media.uploader.username}`} className="text-moonlight hover:underline">
+                {media.uploader.name ?? media.uploader.username}
+              </Link>
+            ) : (
+              (media.uploader?.name ?? "a deleted user")
+            )}{" "}
+            · {formatRelativeTime(media.createdAt)} · {formatCount(media.viewCount)} views
           </p>
         </div>
 

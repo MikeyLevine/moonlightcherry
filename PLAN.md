@@ -65,6 +65,8 @@ All of the above must be enforced **server-side** on every API route/server acti
 - Account merge: if a user signs in with Google after previously using Discord (same verified email), we should decide whether to auto-link or keep separate accounts — **flagged in Open Decisions (§20)**.
 - New-account defaults: `nsfw_enabled = false`, role = `User`.
 
+**Implemented (Phase 8):** since Discord/Google don't provide a username and every account needs a working `/u/[username]` from the moment it exists, `auth.ts`'s `events.createUser` auto-generates one (slugified display name, numeric suffix on collision) at account creation. Existing pre-Phase-8 accounts were backfilled once. Editable afterward from `/settings`.
+
 ---
 
 ## 4. NSFW / Access Control
@@ -80,7 +82,9 @@ All of the above must be enforced **server-side** on every API route/server acti
   - This is a compliance/legal area — **flagged explicitly in §20**, recommend you loop in whatever legal counsel/compliance resource you have before NSFW goes live, independent of anything I can architect.
 - Age gate copy/UX (interstitial vs. inline settings toggle) — to be designed in the UI/UX phase.
 
-**Implemented (Phase 5):** the shared layer is `src/lib/media/query.ts` — `getViewerContext()` + `visibleMediaWhere()`, used by every list (homepage, `/gallery`, `/api/media`) and by `getVisibleMediaById()` for the detail page. Verified directly: an anonymous/non-opted-in viewer gets 404 on a direct NSFW media URL and never sees it in any list; a viewer with `nsfwEnabled: true` sees it in both. The `/settings` opt-in toggle itself doesn't exist yet (no phase has built it), so this path is real but currently unreachable through the UI — only flippable directly in the database.
+**Implemented (Phase 5):** the shared layer is `src/lib/media/query.ts` — `getViewerContext()` + `visibleMediaWhere()`, used by every list (homepage, `/gallery`, `/api/media`) and by `getVisibleMediaById()` for the detail page. Verified directly: an anonymous/non-opted-in viewer gets 404 on a direct NSFW media URL and never sees it in any list; a viewer with `nsfwEnabled: true` sees it in both.
+
+**Implemented (Phase 8):** the opt-in toggle itself now exists on `/settings`, closing the gap noted above — the checkbox is explicit ("I am 18 or older and want to see NSFW content"), off by default, and the page states plainly that opting out (or staying anonymous) means never seeing it regardless. Age-gate interstitial copy/UX beyond a plain settings checkbox is still open, per the line above.
 
 ---
 
