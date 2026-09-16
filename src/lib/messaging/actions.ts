@@ -4,8 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateConversation, isBlockedEitherWay, toMessageView } from "@/lib/messaging/queries";
 import { blocksPosting } from "@/lib/admin/moderationStatus";
-
-const MAX_LENGTH = 4000;
+import { messageContentSchema } from "@/lib/security/schemas";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 
 export async function startConversation(targetUserId: string) {
   const session = await auth();
@@ -26,9 +26,14 @@ export async function sendMessage(conversationId: string, content: string) {
     return { ok: false as const, error: "Your account can't send messages right now." };
   }
 
-  const trimmed = content.trim();
-  if (!trimmed) return { ok: false as const, error: "Message can't be empty." };
-  if (trimmed.length > MAX_LENGTH) return { ok: false as const, error: "Message is too long." };
+  const rateLimit = checkRateLimit(`message:${session.user.id}`, RATE_LIMITS.message.limit, RATE_LIMITS.message.windowMs);
+  if (!rateLimit.ok) {
+    return { ok: false as const, error: `You're sending messages too fast — try again in a bit.` };
+  }
+
+  const parsed = messageContentSchema.safeParse(content);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+  const trimmed = parsed.data;
 
   const userId = session.user.id;
   const participant = await prisma.conversationParticipant.findUnique({

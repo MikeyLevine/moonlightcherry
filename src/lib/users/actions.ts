@@ -3,8 +3,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications/create";
-
-const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])?$/;
+import { profileUpdateSchema } from "@/lib/security/schemas";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 
 export async function updateProfile(input: {
   username: string;
@@ -18,32 +18,30 @@ export async function updateProfile(input: {
     return { ok: false as const, error: "Sign in to edit your profile." };
   }
 
-  const username = input.username.trim().toLowerCase();
-  if (!USERNAME_PATTERN.test(username)) {
-    return {
-      ok: false as const,
-      error: "Username must be 3-30 characters: lowercase letters, numbers, and hyphens only.",
-    };
-  }
+  const rateLimit = checkRateLimit(
+    `profile-update:${session.user.id}`,
+    RATE_LIMITS.profileUpdate.limit,
+    RATE_LIMITS.profileUpdate.windowMs
+  );
+  if (!rateLimit.ok) return { ok: false as const, error: "Too many profile updates — try again later." };
+
+  const parsed = profileUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+  const { username, bio, websiteUrl, twitterHandle, nsfwEnabled } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { username }, select: { id: true } });
   if (existing && existing.id !== session.user.id) {
     return { ok: false as const, error: "That username is already taken." };
   }
 
-  const websiteUrl = input.websiteUrl.trim();
-  if (websiteUrl && !/^https?:\/\/.+/.test(websiteUrl)) {
-    return { ok: false as const, error: "Website URL must start with http:// or https://." };
-  }
-
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
       username,
-      bio: input.bio.trim() || null,
+      bio: bio || null,
       websiteUrl: websiteUrl || null,
-      twitterHandle: input.twitterHandle.trim().replace(/^@/, "") || null,
-      nsfwEnabled: input.nsfwEnabled,
+      twitterHandle: twitterHandle.replace(/^@/, "") || null,
+      nsfwEnabled,
     },
   });
 

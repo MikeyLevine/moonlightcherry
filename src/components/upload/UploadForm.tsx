@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SeriesType } from "@prisma/client";
 import { Button } from "@/components/ui/Button";
 import { MetadataFields, type Category } from "@/components/media/MetadataFields";
+import { TurnstileWidget } from "@/components/security/TurnstileWidget";
 
 const ACCEPTED = "image/jpeg,image/png,image/webp,image/avif,image/gif";
 
@@ -23,6 +24,7 @@ export function UploadForm({ categories }: { categories: Category[] }) {
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0] ?? null;
@@ -52,6 +54,7 @@ export function UploadForm({ categories }: { categories: Category[] }) {
     formData.append("character", character);
     formData.append("series", series);
     formData.append("seriesType", seriesType);
+    if (turnstileToken) formData.append("turnstileToken", turnstileToken);
     categoryIds.forEach((id) => formData.append("categoryIds", id));
 
     // XMLHttpRequest, not fetch, specifically because it exposes real
@@ -161,6 +164,8 @@ export function UploadForm({ categories }: { categories: Category[] }) {
             </span>
           </span>
         </label>
+
+        <TurnstileWidget onToken={setTurnstileToken} />
 
         <div>
           <Button type="submit" variant="primary" disabled={!file || status === "uploading"}>

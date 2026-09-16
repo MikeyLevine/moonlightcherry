@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { extractMentionedUsernames } from "@/lib/comments/mentions";
 import { createNotification, createNotifications } from "@/lib/notifications/create";
 import { blocksPosting } from "@/lib/admin/moderationStatus";
+import { commentContentSchema } from "@/lib/security/schemas";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
 
-const MAX_LENGTH = 2000;
 const AUTHOR_SELECT = { id: true, name: true, username: true, image: true } as const;
 
 export async function postComment(mediaId: string, content: string, parentId: string | null) {
@@ -16,9 +17,14 @@ export async function postComment(mediaId: string, content: string, parentId: st
     return { ok: false as const, error: "Your account can't post comments right now." };
   }
 
-  const trimmed = content.trim();
-  if (!trimmed) return { ok: false as const, error: "Comment can't be empty." };
-  if (trimmed.length > MAX_LENGTH) return { ok: false as const, error: "Comment is too long." };
+  const rateLimit = checkRateLimit(`comment:${session.user.id}`, RATE_LIMITS.comment.limit, RATE_LIMITS.comment.windowMs);
+  if (!rateLimit.ok) {
+    return { ok: false as const, error: `You're commenting too fast — try again in a bit.` };
+  }
+
+  const parsed = commentContentSchema.safeParse(content);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+  const trimmed = parsed.data;
 
   const media = await prisma.media.findUnique({
     where: { id: mediaId },

@@ -9,6 +9,9 @@ import { getUploadLimits } from "@/lib/site-settings";
 import { enqueueProcessMedia } from "@/lib/media/queue";
 import { syncMediaAssociations } from "@/lib/taxonomy/sync";
 import { blocksUploading } from "@/lib/admin/moderationStatus";
+import { uploadMetadataSchema, taxonomyNameSchema } from "@/lib/security/schemas";
+import { checkRateLimit, getClientIpFromRequest, RATE_LIMITS } from "@/lib/security/rate-limit";
+import { verifyTurnstile } from "@/lib/security/turnstile";
 
 const EXT_BY_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -34,6 +37,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your account can't upload right now." }, { status: 403 });
   }
 
+  const ip = getClientIpFromRequest(req);
+  const perUser = checkRateLimit(`upload:${session.user.id}`, RATE_LIMITS.upload.limit, RATE_LIMITS.upload.windowMs);
+  if (!perUser.ok) {
+    return NextResponse.json(
+      { error: "You're uploading too fast — try again later." },
+      { status: 429, headers: { "Retry-After": String(perUser.retryAfterSeconds) } }
+    );
+  }
+  const perIp = checkRateLimit(`upload-ip:${ip}`, RATE_LIMITS.uploadPerIp.limit, RATE_LIMITS.uploadPerIp.windowMs);
+  if (!perIp.ok) {
+    return NextResponse.json(
+      { error: "Too many uploads from this network — try again later." },
+      { status: 429, headers: { "Retry-After": String(perIp.retryAfterSeconds) } }
+    );
+  }
+
   const limits = await getUploadLimits();
   const headroom = await checkStorageHeadroom(limits.warnThresholdPercent, limits.blockThresholdPercent);
   if (headroom.overBlockThreshold) {
@@ -48,6 +67,19 @@ export async function POST(req: NextRequest) {
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
+  }
+
+  const turnstile = await verifyTurnstile(stringField(formData, "turnstileToken") || null);
+  if (!turnstile.ok) {
+    return NextResponse.json({ error: turnstile.error ?? "Verification failed." }, { status: 403 });
+  }
+
+  const metadataResult = uploadMetadataSchema.safeParse({
+    title: stringField(formData, "title"),
+    description: stringField(formData, "description"),
+  });
+  if (!metadataResult.success) {
+    return NextResponse.json({ error: metadataResult.error.issues[0].message }, { status: 422 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -66,8 +98,7 @@ export async function POST(req: NextRequest) {
   const ext = EXT_BY_MIME[validation.mimeType] ?? "bin";
   await putMediaFile(checksum, `original.${ext}`, buffer);
 
-  const title = stringField(formData, "title").trim();
-  const description = stringField(formData, "description").trim();
+  const { title, description } = metadataResult.data;
   const nsfw = stringField(formData, "nsfw") === "true";
   const seriesTypeRaw = stringField(formData, "seriesType");
   const seriesType = SERIES_TYPES.includes(seriesTypeRaw as SeriesType) ? (seriesTypeRaw as SeriesType) : "ANIME";
@@ -87,10 +118,12 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  const clampName = (value: string) => taxonomyNameSchema.safeParse(value).data ?? value.slice(0, 80);
+
   await syncMediaAssociations(media.id, {
-    tagNames: stringField(formData, "tags").split(","),
-    characterName: stringField(formData, "character").trim() || null,
-    seriesName: stringField(formData, "series").trim() || null,
+    tagNames: stringField(formData, "tags").split(",").map(clampName),
+    characterName: clampName(stringField(formData, "character").trim()) || null,
+    seriesName: clampName(stringField(formData, "series").trim()) || null,
     seriesType,
     categoryIds: formData.getAll("categoryIds").filter((v): v is string => typeof v === "string"),
   });

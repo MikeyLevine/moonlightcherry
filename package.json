@@ -22,7 +22,8 @@
     "pg-boss": "^12.32.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
