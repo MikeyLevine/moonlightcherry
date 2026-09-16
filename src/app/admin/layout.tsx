@@ -8,6 +8,9 @@ const NAV = [
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/media", label: "Media" },
   { href: "/admin/users", label: "Users" },
+  { href: "/admin/tags", label: "Tags" },
+  { href: "/admin/characters", label: "Characters" },
+  { href: "/admin/series", label: "Series" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 py-10 sm:px-8">
-      <div className="mb-8 flex items-center gap-6 border-b border-white/[0.09] pb-4">
+      <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-white/[0.09] pb-4">
         {NAV.map((item) => (
           <Link key={item.href} href={item.href} className="text-sm text-ash hover:text-moonlight">
             {item.label}

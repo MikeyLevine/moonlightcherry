@@ -40,20 +40,6 @@ export async function syncMediaAssociations(mediaId: string, input: SyncAssociat
     tagIds.push(tag.id);
   }
 
-  let characterId: string | null = null;
-  const characterName = input.characterName?.trim();
-  if (characterName) {
-    const slug = slugify(characterName);
-    if (slug) {
-      const character = await prisma.character.upsert({
-        where: { slug },
-        update: {},
-        create: { name: characterName, slug },
-      });
-      characterId = character.id;
-    }
-  }
-
   let seriesId: string | null = null;
   const seriesName = input.seriesName?.trim();
   if (seriesName) {
@@ -65,6 +51,24 @@ export async function syncMediaAssociations(mediaId: string, input: SyncAssociat
         create: { name: seriesName, slug, type: input.seriesType },
       });
       seriesId = series.id;
+    }
+  }
+
+  // Series resolved first so a brand-new character picks up the same
+  // upload's series at creation time. Never overwrites an *existing*
+  // character's series (update: {} is a deliberate no-op) — a later upload
+  // shouldn't silently reassign a character someone already curated.
+  let characterId: string | null = null;
+  const characterName = input.characterName?.trim();
+  if (characterName) {
+    const slug = slugify(characterName);
+    if (slug) {
+      const character = await prisma.character.upsert({
+        where: { slug },
+        update: {},
+        create: { name: characterName, slug, seriesId },
+      });
+      characterId = character.id;
     }
   }
 
