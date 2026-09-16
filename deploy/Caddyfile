@@ -15,7 +15,7 @@
 #   outside the app's own directory, per .env.example's note that local
 #   storage under the app dir isn't safe from being wiped by a redeploy.
 #
-# Install: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# Install: sudo cp /srv/moonlightcherry/app/deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
 
 moonlightcherry.xyz {
 	tls /etc/caddy/certs/moonlightcherry-origin.pem /etc/caddy/certs/moonlightcherry-origin-key.pem
@@ -36,7 +36,7 @@ moonlightcherry.xyz {
 		}
 	}
 
-	reverse_proxy localhost:3000
+	reverse_proxy localhost:3001
 }
 
 www.moonlightcherry.xyz {
