@@ -1,40 +1,77 @@
 # Production launch checklist
 
-Everything in this directory is a config artifact — none of it is installed
-or active until you run the steps below. `dev.moonlightcherry.xyz` keeps
-working throughout; none of this touches it.
+`dev.moonlightcherry.xyz` keeps working throughout, unchanged — production
+runs from a **separate checkout, separate database, separate port**
+(`/srv/moonlightcherry/app`, its own Postgres database, port 3001 behind
+Caddy) specifically so nothing about actively developing on
+`dev.moonlightcherry.xyz` can ever touch the live site.
 
-## 1. DNS & Cloudflare (you, in the Cloudflare dashboard)
+## Done already (by Claude, in the session that wrote this file)
 
-1. Confirm you know this server's public IP (from your router/ISP). If your
-   ISP doesn't give you a static IP, this whole setup breaks silently the
-   next time it changes — either get a static IP from your ISP, or add a
-   dynamic-DNS updater (e.g. Cloudflare's own API via a small cron job) before
-   relying on this for real. Worth checking now, not after launch.
-2. In Cloudflare DNS: create an `A` record for `moonlightcherry.xyz` pointing
-   at that IP, **Proxied** (orange cloud). Same for `www.moonlightcherry.xyz`.
-3. SSL/TLS settings -> set mode to **Full (strict)**.
-4. SSL/TLS -> Origin Server -> **Create Certificate**. Choose the default
-   (Cloudflare CA, RSA), list both `moonlightcherry.xyz` and
-   `www.moonlightcherry.xyz` as hostnames, 15-year validity. Save the two
-   outputs (certificate + private key) — Cloudflare only shows the key once.
-5. Confirm the CSAM Scanning Tool (Caching -> Configuration) is enabled —
-   you said you've done this already.
+- [x] Cloned a dedicated production checkout to `/srv/moonlightcherry/app`
+      (separate from `/srv/moonlight-cherry` — an unrelated, mostly-empty
+      leftover from an earlier abandoned attempt, left untouched).
+- [x] Created `moonlightcherry_prod`, a genuinely separate Postgres
+      **database and role** (not just a different DB under dev's login) in
+      the same Postgres container dev already uses — real credential
+      separation, not just data separation.
+- [x] Created `/srv/moonlightcherry/storage/media` outside any repo checkout.
+- [x] Wrote `/srv/moonlightcherry/app/.env` — fresh `AUTH_SECRET`, the new
+      prod DB role/password, `SITE_URL`, `MEDIA_STORAGE_DIR`, and the
+      existing Discord/Google OAuth client credentials reused from dev
+      (see note below on why that's fine).
+- [ ] Turnstile keys — still unset, ships disabled. Add
+      `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to that same
+      `.env` if you want it on for launch.
 
-## 2. Move media storage outside the app directory
+Re-running `deploy/deploy.sh` from `/srv/moonlightcherry/app` is how you ship
+future updates — it does a `git pull` from there, not from the dev directory.
 
-The app currently stores media under `./storage/media` inside the repo — the
-project has already lost one test upload this way (an untracked directory
-inside a repo checkout isn't durable). Production should use a real path:
+## Still needed: OAuth redirect URIs (you — dashboard access only you have)
+
+Reusing the *same* Discord/Google OAuth app credentials as dev is fine and
+standard — a single OAuth app can have multiple authorized redirect URIs.
+Add these to the existing apps (don't remove the existing dev ones):
+
+- Discord Developer Portal: add `https://moonlightcherry.xyz/auth/callback/discord`
+- Google Cloud Console: add `https://moonlightcherry.xyz/auth/callback/google`
+
+## 5. First build and start (not internet-facing yet)
 
 ```bash
-sudo mkdir -p /srv/moonlightcherry/storage/media
-sudo chown jovan:jovan /srv/moonlightcherry/storage/media
+cd /srv/moonlightcherry/app
+npm ci
+npx prisma generate
+npx prisma db push
+npm run build
+
+sudo cp deploy/moonlightcherry.service deploy/moonlightcherry-worker.service /etc/systemd/system/
+sudo cp deploy/moonlightcherry-backup.service deploy/moonlightcherry-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now moonlightcherry.service
+sudo systemctl enable --now moonlightcherry-worker.service
+sudo systemctl enable --now moonlightcherry-backup.timer
+
+curl -I http://localhost:3001   # should 200 — confirms the app itself is healthy before Caddy/DNS touch it
 ```
 
-Then set `MEDIA_STORAGE_DIR=/srv/moonlightcherry/storage/media` in production's `.env`.
+## 6. DNS & Cloudflare (you, in the Cloudflare dashboard — I can't do this part)
 
-## 3. Install the Cloudflare Origin certificate
+1. Confirm this server's public IP (from your router/ISP) and whether it's
+   static. If it can change without notice, this setup breaks silently the
+   next time it does — either get a static IP or add a dynamic-DNS updater
+   before relying on this for real.
+2. Cloudflare DNS: `A` record for `moonlightcherry.xyz` -> that IP,
+   **Proxied** (orange cloud). Same for `www.moonlightcherry.xyz`.
+3. SSL/TLS settings -> mode **Full (strict)**.
+4. SSL/TLS -> Origin Server -> **Create Certificate** (default CA, RSA),
+   hostnames `moonlightcherry.xyz` + `www.moonlightcherry.xyz`, 15-year
+   validity. Cloudflare shows the private key exactly once — save both
+   outputs somewhere before closing that dialog.
+5. Confirm the CSAM Scanning Tool (Caching -> Configuration) is still
+   enabled — you already did this.
+
+## 7. Install the Origin certificate directly on the server (not pasted into chat)
 
 ```bash
 sudo mkdir -p /etc/caddy/certs
@@ -43,7 +80,7 @@ sudo vi /etc/caddy/certs/moonlightcherry-origin-key.pem  # paste the private key
 sudo chmod 600 /etc/caddy/certs/moonlightcherry-origin-key.pem
 ```
 
-## 4. Install and configure Caddy
+## 8. Install and configure Caddy
 
 ```bash
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -51,61 +88,47 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --d
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
 sudo apt update && sudo apt install caddy
 
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo cp /srv/moonlightcherry/app/deploy/Caddyfile /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
 
-## 5. Restrict the firewall to Cloudflare only
+## 9. Restrict the firewall to Cloudflare only
 
 Traffic that bypasses Cloudflare also bypasses the CSAM scan — this matters,
 not just a hardening nice-to-have.
 
 ```bash
-./deploy/allow-cloudflare-only.sh
+/srv/moonlightcherry/app/deploy/allow-cloudflare-only.sh
 ```
 
-## 6. Production `.env`
-
-Copy `.env` to a production version (or edit in place if this host only ever
-runs production) with:
-
-- A **different** `AUTH_SECRET` than dev (`openssl rand -base64 32`).
-- `POSTGRES_PASSWORD` set to a real generated password, matching the same
-  password embedded in `DATABASE_URL` (docker-compose and Prisma each read
-  these independently — see the comment in `docker-compose.yml`).
-- `MEDIA_STORAGE_DIR=/srv/moonlightcherry/storage/media` (step 2).
-- `SITE_URL=https://moonlightcherry.xyz`.
-- Real `AUTH_DISCORD_ID`/`SECRET` and `AUTH_GOOGLE_ID`/`SECRET` — **and** add
-  `https://moonlightcherry.xyz/auth/callback/discord` and
-  `https://moonlightcherry.xyz/auth/callback/google` as authorized redirect
-  URIs in the Discord Developer Portal and Google Cloud Console. The
-  existing dev redirect URIs should stay as-is.
-- `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — worth turning
-  on for a public launch; still optional, ships disabled if left unset.
-
-## 7. First deploy
-
-```bash
-sudo cp deploy/moonlightcherry.service deploy/moonlightcherry-worker.service /etc/systemd/system/
-sudo cp deploy/moonlightcherry-backup.service deploy/moonlightcherry-backup.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-
-./deploy/deploy.sh   # installs deps, applies schema, builds, restarts services
-
-sudo systemctl enable --now moonlightcherry.service
-sudo systemctl enable --now moonlightcherry-worker.service
-sudo systemctl enable --now moonlightcherry-backup.timer
-```
-
-## 8. Verify
+## 10. Verify
 
 ```bash
 curl -I https://moonlightcherry.xyz
-curl -I https://www.moonlightcherry.xyz   # should 301 to the bare domain
+curl -I https://www.moonlightcherry.xyz   # should redirect to the bare domain
 curl https://moonlightcherry.xyz/robots.txt
 journalctl -u moonlightcherry -u moonlightcherry-worker -f
 ```
 
-Then sign in for real through both OAuth providers on the production domain
+Sign in for real through both OAuth providers on the production domain
 before calling it launched — redirect URIs are the single most common thing
 that looks right in config and still fails at the button.
+
+## 11. Make yourself admin on production
+
+This is a fresh database — your production account isn't ADMINISTRATOR
+until you sign in once (creating the row) and this runs against the *prod*
+database, not dev's:
+
+```bash
+docker exec moonlightcherry-postgres-1 psql -U moonlightcherry -d moonlightcherry_prod \
+  -c "UPDATE users SET role='ADMINISTRATOR' WHERE username='daddy';"
+```
+
+## Shipping future updates
+
+From `/srv/moonlightcherry/app`:
+
+```bash
+./deploy/deploy.sh
+```

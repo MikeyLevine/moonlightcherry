@@ -6,10 +6,14 @@ Requires=docker.service
 [Service]
 Type=simple
 User=jovan
-WorkingDirectory=/home/jovan/moonlightcherry
-EnvironmentFile=/home/jovan/moonlightcherry/.env
+# A separate checkout from the dev directory (/home/jovan/moonlightcherry)
+# on purpose — production must never run out of the same working tree an
+# active dev session is editing/building in.
+WorkingDirectory=/srv/moonlightcherry/app
+EnvironmentFile=/srv/moonlightcherry/app/.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/npm run start
+# Port 3001, not Next's default 3000 — dev already owns 3000 on this host.
+ExecStart=/usr/bin/npx next start -p 3001
 Restart=on-failure
 RestartSec=5
 

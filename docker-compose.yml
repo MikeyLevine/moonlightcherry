@@ -4,10 +4,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: moonlightcherry
-      # Dev default kept as a fallback so local setup needs no extra config.
-      # Production MUST set a real POSTGRES_PASSWORD in .env — and it must
-      # match the password embedded in DATABASE_URL, since docker-compose and
-      # Prisma read these independently; nothing keeps them in sync but you.
+      # Only applied the first time this container initializes an empty data
+      # volume — changing it later has no effect on an already-running
+      # instance (Postgres passwords belong to the role, not this env var).
+      # Production doesn't touch this at all: it uses its own separately
+      # created Postgres role (moonlightcherry_prod) inside this same
+      # instance, provisioned once via `CREATE ROLE ... WITH LOGIN PASSWORD`
+      # (see deploy/README.md) — proper credential separation from dev's
+      # role, not just a different database under the same login.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moonlightcherry_dev}
       POSTGRES_DB: moonlightcherry
     ports:
