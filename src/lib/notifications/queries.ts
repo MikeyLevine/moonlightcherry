@@ -1,7 +1,7 @@
 import type { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-type NotificationPayload = { actorId?: string; mediaId?: string; commentId?: string };
+type NotificationPayload = { actorId?: string; mediaId?: string; commentId?: string; conversationId?: string };
 
 export type NotificationView = {
   id: string;
@@ -53,7 +53,13 @@ export async function getNotifications(userId: string, take = 50): Promise<Notif
     const payload = r.payload as NotificationPayload;
     const actor = payload.actorId ? (actorMap.get(payload.actorId) ?? null) : null;
     const media = payload.mediaId ? mediaMap.get(payload.mediaId) : undefined;
-    const href = payload.mediaId ? `/i/${payload.mediaId}` : actor?.username ? `/u/${actor.username}` : "/notifications";
+    const href = payload.conversationId
+      ? `/messages/${payload.conversationId}`
+      : payload.mediaId
+        ? `/i/${payload.mediaId}`
+        : actor?.username
+          ? `/u/${actor.username}`
+          : "/notifications";
 
     return {
       id: r.id,

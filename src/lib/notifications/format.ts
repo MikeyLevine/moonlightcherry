@@ -14,6 +14,8 @@ export function notificationText(type: NotificationType, actorLabel: string): st
       return `${actorLabel} started following you`;
     case "NEW_UPLOAD":
       return `${actorLabel} uploaded something new`;
+    case "MESSAGE":
+      return `${actorLabel} sent you a message`;
     case "MODERATION":
       return "A moderator took action on your account or content";
     case "SYSTEM":

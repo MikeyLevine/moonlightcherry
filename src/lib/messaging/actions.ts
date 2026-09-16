@@ -6,6 +6,7 @@ import { getOrCreateConversation, isBlockedEitherWay, toMessageView } from "@/li
 import { blocksPosting } from "@/lib/admin/moderationStatus";
 import { messageContentSchema } from "@/lib/security/schemas";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
+import { createNotification } from "@/lib/notifications/create";
 
 export async function startConversation(targetUserId: string) {
   const session = await auth();
@@ -57,6 +58,10 @@ export async function sendMessage(conversationId: string, content: string) {
       data: { lastReadAt: new Date() },
     }),
   ]);
+
+  if (otherParticipant) {
+    await createNotification(otherParticipant.userId, "MESSAGE", { actorId: userId, conversationId }, userId);
+  }
 
   return { ok: true as const, message: toMessageView(message) };
 }
