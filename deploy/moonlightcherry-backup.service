@@ -1,0 +1,9 @@
+[Unit]
+Description=Moonlight Cherry backup (database + media storage)
+
+[Service]
+Type=oneshot
+User=jovan
+WorkingDirectory=/home/jovan/moonlightcherry
+EnvironmentFile=/home/jovan/moonlightcherry/.env
+ExecStart=/home/jovan/moonlightcherry/deploy/backup.sh

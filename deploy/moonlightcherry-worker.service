@@ -1,0 +1,19 @@
+[Unit]
+Description=Moonlight Cherry background worker (pg-boss)
+After=network.target docker.service moonlightcherry.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=jovan
+WorkingDirectory=/home/jovan/moonlightcherry
+EnvironmentFile=/home/jovan/moonlightcherry/.env
+Environment=NODE_ENV=production
+# Plain tsx, not `tsx watch` — file-watching is a dev convenience with no
+# purpose (and a real cost) in a long-running production process.
+ExecStart=/usr/bin/npx tsx scripts/worker.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,5 @@
 import type { Prisma, Role } from "@prisma/client";
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -244,7 +245,7 @@ export type MediaDetail = Prisma.MediaGetPayload<{ include: typeof DETAIL_INCLUD
  * the post-upload redirect doesn't 404 on itself. Soft-deleted items 404 for
  * everyone, including the owner.
  */
-export async function getVisibleMediaById(id: string, viewer: ViewerContext): Promise<MediaDetail | null> {
+export const getVisibleMediaById = cache(async (id: string, viewer: ViewerContext): Promise<MediaDetail | null> => {
   return prisma.media.findFirst({
     where: {
       id,
@@ -256,4 +257,4 @@ export async function getVisibleMediaById(id: string, viewer: ViewerContext): Pr
     },
     include: DETAIL_INCLUDE,
   });
-}
+});

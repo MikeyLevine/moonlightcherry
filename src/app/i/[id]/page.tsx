@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,6 +22,43 @@ import { ReportButton } from "@/components/moderation/ReportButton";
 import { ChipLink } from "@/components/ui/Chip";
 import { buttonBaseClasses, buttonVariantClasses } from "@/components/ui/Button";
 import { ProcessingPoller } from "./ProcessingPoller";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const viewer = await getViewerContext();
+  const media = await getVisibleMediaById(id, viewer);
+
+  if (!media || media.status !== "PUBLISHED") {
+    return { title: "Not found" };
+  }
+
+  // NSFW previews must never render outside the NSFW-gated app itself — a
+  // chat app unfurling this link has no idea about opt-in state, so no real
+  // title/description/image goes into Open Graph for these (PLAN.md §4).
+  if (media.nsfw) {
+    return {
+      title: "NSFW artwork",
+      description: "Sign in and opt in to NSFW content on Moonlight Cherry to view this.",
+      robots: { index: false, follow: false },
+      openGraph: { title: "NSFW artwork", description: "Moonlight Cherry" },
+    };
+  }
+
+  const image = media.variants.find((v) => v.kind === "SMALL") ?? media.variants.find((v) => v.kind === "POSTER");
+  const title = media.title ?? "Untitled";
+  const description = media.description ?? "Anime art on Moonlight Cherry.";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: image ? [{ url: image.url, width: image.width, height: image.height }] : undefined,
+    },
+    twitter: { card: "summary_large_image", title, description },
+  };
+}
 
 export default async function MediaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

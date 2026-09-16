@@ -3,6 +3,7 @@ import { Bodoni_Moda, Hanken_Grotesk, Unbounded } from "next/font/google";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { auth } from "@/auth";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const bodoniModa = Bodoni_Moda({
@@ -25,6 +26,7 @@ const unbounded = Unbounded({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: "Moonlight Cherry",
     template: "%s · Moonlight Cherry",

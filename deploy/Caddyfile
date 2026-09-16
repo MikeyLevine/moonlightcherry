@@ -1,0 +1,45 @@
+# Production Caddy config for moonlightcherry.xyz.
+#
+# Assumes:
+# - Cloudflare DNS record for moonlightcherry.xyz is Proxied (orange cloud),
+#   SSL/TLS mode set to "Full (strict)" in the Cloudflare dashboard.
+# - A Cloudflare Origin CA certificate (Cloudflare dashboard -> SSL/TLS ->
+#   Origin Server -> Create Certificate, for moonlightcherry.xyz and
+#   www.moonlightcherry.xyz) saved at the paths below. This is NOT a public
+#   CA cert and won't validate for direct visits to the origin IP — that's
+#   fine, since only Cloudflare's edge ever talks to this server directly.
+#   Automatic Let's Encrypt (Caddy's default) is deliberately not used here:
+#   its HTTP-01 challenge doesn't play well with a proxied record, and the
+#   Origin CA cert is the standard fix for exactly this setup.
+# - MEDIA_STORAGE_DIR points here at /srv/moonlightcherry/storage/media —
+#   outside the app's own directory, per .env.example's note that local
+#   storage under the app dir isn't safe from being wiped by a redeploy.
+#
+# Install: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+
+moonlightcherry.xyz {
+	tls /etc/caddy/certs/moonlightcherry-origin.pem /etc/caddy/certs/moonlightcherry-origin-key.pem
+
+	encode gzip zstd
+
+	# Caddy serves media files directly off disk — no Node involvement for
+	# the actual bytes, per PLAN.md §17. The app's own /media/[...path]
+	# route (with its own ETag logic) still exists for dev, where nothing
+	# sits in front of it.
+	handle_path /media/* {
+		root * /srv/moonlightcherry/storage/media
+		@missing not file {path}
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+		handle @missing {
+			respond "Not found" 404
+		}
+	}
+
+	reverse_proxy localhost:3000
+}
+
+www.moonlightcherry.xyz {
+	tls /etc/caddy/certs/moonlightcherry-origin.pem /etc/caddy/certs/moonlightcherry-origin-key.pem
+	redir https://moonlightcherry.xyz{uri} permanent
+}

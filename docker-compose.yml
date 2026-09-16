@@ -4,7 +4,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: moonlightcherry
-      POSTGRES_PASSWORD: moonlightcherry_dev
+      # Dev default kept as a fallback so local setup needs no extra config.
+      # Production MUST set a real POSTGRES_PASSWORD in .env — and it must
+      # match the password embedded in DATABASE_URL, since docker-compose and
+      # Prisma read these independently; nothing keeps them in sync but you.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moonlightcherry_dev}
       POSTGRES_DB: moonlightcherry
     ports:
       - "127.0.0.1:5432:5432"

@@ -1,0 +1,17 @@
+[Unit]
+Description=Moonlight Cherry web app
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=jovan
+WorkingDirectory=/home/jovan/moonlightcherry
+EnvironmentFile=/home/jovan/moonlightcherry/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
