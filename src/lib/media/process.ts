@@ -78,9 +78,6 @@ export async function processMedia(mediaId: string): Promise<void> {
       .toBuffer({ resolveWithObject: true });
     variants.push({ kind: "POSTER", buffer: poster.data, width: poster.info.width, height: poster.info.height, format: "webp" });
 
-    const preview = await resizeAnimated(original, 480, 60, 4);
-    variants.push({ kind: "ANIMATED_PREVIEW", buffer: preview.data, width: preview.info.width, height: preview.info.height, format: "webp" });
-
     const medium = await resizeAnimated(original, 1200, 75, 4);
     variants.push({ kind: "MEDIUM", buffer: medium.data, width: medium.info.width, height: medium.info.height, format: "webp" });
   } else {

@@ -2,23 +2,11 @@ import Link from "next/link";
 import { SearchField } from "@/components/ui/SearchField";
 import { ChipLink } from "@/components/ui/Chip";
 import { MediaGrid, EmptyMediaState } from "@/components/media/MediaGrid";
-import {
-  getViewerContext,
-  getTrendingMedia,
-  getRecentMedia,
-  getMostLikedMedia,
-  getPopularCategories,
-} from "@/lib/media/query";
+import { getViewerContext, getHomepageSections, type getTrendingMedia } from "@/lib/media/query";
 
 export default async function HomePage() {
   const viewer = await getViewerContext();
-
-  const [trending, recent, mostLiked, categories] = await Promise.all([
-    getTrendingMedia({ viewer, take: 8 }),
-    getRecentMedia({ viewer, take: 8 }),
-    getMostLikedMedia({ viewer, take: 8 }),
-    getPopularCategories(),
-  ]);
+  const { trending, recent, mostLiked, categories } = await getHomepageSections(viewer.canSeeNsfw);
 
   return (
     <div>

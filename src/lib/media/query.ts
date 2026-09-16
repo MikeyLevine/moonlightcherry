@@ -1,4 +1,5 @@
 import type { Prisma, Role } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -142,6 +143,33 @@ export function getRecentMedia(options: ListOptions) {
 
 export function getMostLikedMedia(options: ListOptions) {
   return getMediaPage("most-liked", options);
+}
+
+/**
+ * The homepage's three sections + category chips, cached for 60s. Safe to
+ * cache keyed only on `canSeeNsfw` (not per-user) because `CARD_SELECT` and
+ * `visibleMediaWhere` never read anything else off `viewer` — no
+ * personalized fields (liked/favorited) leak into these cards. Every other
+ * viewer field in this synthetic context is unused by the query, so it's
+ * fine that they're fake.
+ */
+const getCachedHomepageSections = unstable_cache(
+  async (canSeeNsfw: boolean) => {
+    const viewer: ViewerContext = { userId: null, canSeeNsfw, role: null };
+    const [trending, recent, mostLiked, categories] = await Promise.all([
+      getMediaPage("trending", { viewer, take: 8 }),
+      getMediaPage("recent", { viewer, take: 8 }),
+      getMediaPage("most-liked", { viewer, take: 8 }),
+      getPopularCategories(),
+    ]);
+    return { trending, recent, mostLiked, categories };
+  },
+  ["homepage-sections"],
+  { revalidate: 60 }
+);
+
+export function getHomepageSections(canSeeNsfw: boolean) {
+  return getCachedHomepageSections(canSeeNsfw);
 }
 
 const OWN_UPLOAD_SELECT = {

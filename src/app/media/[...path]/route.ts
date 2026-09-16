@@ -11,17 +11,31 @@ const CONTENT_TYPES: Record<string, string> = {
   gif: "image/gif",
 };
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: segments } = await params;
   const filePath = resolveMediaFilePath(segments);
   if (!filePath) {
     return new NextResponse("Not found", { status: 404 });
   }
 
+  let size: number;
   try {
-    await stat(filePath);
+    size = (await stat(filePath)).size;
   } catch {
     return new NextResponse("Not found", { status: 404 });
+  }
+
+  // The path itself is content-addressed (checksum-derived), so it's already
+  // a valid strong identity for this exact byte content — no need to hash
+  // the file contents to get a real ETag.
+  const etag = `"${segments.join("/")}-${size}"`;
+  const cacheHeaders = {
+    "Cache-Control": "public, max-age=31536000, immutable",
+    ETag: etag,
+  };
+
+  if (req.headers.get("if-none-match") === etag) {
+    return new NextResponse(null, { status: 304, headers: cacheHeaders });
   }
 
   const data = await readFile(filePath);
@@ -29,10 +43,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
 
   return new NextResponse(new Uint8Array(data), {
-    headers: {
-      "Content-Type": contentType,
-      // Content-addressed filenames never change contents, so cache forever.
-      "Cache-Control": "public, max-age=31536000, immutable",
-    },
+    headers: { "Content-Type": contentType, ...cacheHeaders },
   });
 }
