@@ -62,6 +62,13 @@ export function getClientIpFromRequest(req: Request): string {
   return "unknown";
 }
 
+/**
+ * Default limit counts + fixed windows. The count half of each is overridable
+ * from /admin/settings (src/lib/site-settings.ts) without a redeploy; the
+ * window stays fixed in code — the number an admin actually wants to turn is
+ * "how many," not "over what period," and exposing both would double the
+ * settings surface for little real benefit.
+ */
 export const RATE_LIMITS = {
   upload: { limit: 15, windowMs: 60 * 60 * 1000 },
   uploadPerIp: { limit: 30, windowMs: 60 * 60 * 1000 },

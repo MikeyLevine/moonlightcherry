@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications/create";
 import { profileUpdateSchema } from "@/lib/security/schemas";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
+import { getRateLimitOverrides } from "@/lib/site-settings";
 
 export async function updateProfile(input: {
   username: string;
@@ -18,9 +19,10 @@ export async function updateProfile(input: {
     return { ok: false as const, error: "Sign in to edit your profile." };
   }
 
+  const limits = await getRateLimitOverrides();
   const rateLimit = checkRateLimit(
     `profile-update:${session.user.id}`,
-    RATE_LIMITS.profileUpdate.limit,
+    limits.profileUpdate,
     RATE_LIMITS.profileUpdate.windowMs
   );
   if (!rateLimit.ok) return { ok: false as const, error: "Too many profile updates — try again later." };

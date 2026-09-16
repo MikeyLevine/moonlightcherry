@@ -7,6 +7,7 @@ import { createNotification, createNotifications } from "@/lib/notifications/cre
 import { blocksPosting } from "@/lib/admin/moderationStatus";
 import { commentContentSchema } from "@/lib/security/schemas";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
+import { getRateLimitOverrides } from "@/lib/site-settings";
 
 const AUTHOR_SELECT = { id: true, name: true, username: true, image: true } as const;
 
@@ -17,7 +18,8 @@ export async function postComment(mediaId: string, content: string, parentId: st
     return { ok: false as const, error: "Your account can't post comments right now." };
   }
 
-  const rateLimit = checkRateLimit(`comment:${session.user.id}`, RATE_LIMITS.comment.limit, RATE_LIMITS.comment.windowMs);
+  const limits = await getRateLimitOverrides();
+  const rateLimit = checkRateLimit(`comment:${session.user.id}`, limits.comment, RATE_LIMITS.comment.windowMs);
   if (!rateLimit.ok) {
     return { ok: false as const, error: `You're commenting too fast — try again in a bit.` };
   }

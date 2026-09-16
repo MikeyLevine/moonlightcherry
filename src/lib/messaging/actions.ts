@@ -6,6 +6,7 @@ import { getOrCreateConversation, isBlockedEitherWay, toMessageView } from "@/li
 import { blocksPosting } from "@/lib/admin/moderationStatus";
 import { messageContentSchema } from "@/lib/security/schemas";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/security/rate-limit";
+import { getRateLimitOverrides } from "@/lib/site-settings";
 import { createNotification } from "@/lib/notifications/create";
 
 export async function startConversation(targetUserId: string) {
@@ -27,7 +28,8 @@ export async function sendMessage(conversationId: string, content: string) {
     return { ok: false as const, error: "Your account can't send messages right now." };
   }
 
-  const rateLimit = checkRateLimit(`message:${session.user.id}`, RATE_LIMITS.message.limit, RATE_LIMITS.message.windowMs);
+  const limits = await getRateLimitOverrides();
+  const rateLimit = checkRateLimit(`message:${session.user.id}`, limits.message, RATE_LIMITS.message.windowMs);
   if (!rateLimit.ok) {
     return { ok: false as const, error: `You're sending messages too fast — try again in a bit.` };
   }

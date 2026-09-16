@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { validateUpload } from "@/lib/media/validate";
 import { putMediaFile, checkStorageHeadroom } from "@/lib/media/storage";
-import { getUploadLimits } from "@/lib/site-settings";
+import { getUploadLimits, getRateLimitOverrides } from "@/lib/site-settings";
 import { enqueueProcessMedia } from "@/lib/media/queue";
 import { syncMediaAssociations } from "@/lib/taxonomy/sync";
 import { blocksUploading } from "@/lib/admin/moderationStatus";
@@ -38,14 +38,15 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = getClientIpFromRequest(req);
-  const perUser = checkRateLimit(`upload:${session.user.id}`, RATE_LIMITS.upload.limit, RATE_LIMITS.upload.windowMs);
+  const rateLimits = await getRateLimitOverrides();
+  const perUser = checkRateLimit(`upload:${session.user.id}`, rateLimits.upload, RATE_LIMITS.upload.windowMs);
   if (!perUser.ok) {
     return NextResponse.json(
       { error: "You're uploading too fast — try again later." },
       { status: 429, headers: { "Retry-After": String(perUser.retryAfterSeconds) } }
     );
   }
-  const perIp = checkRateLimit(`upload-ip:${ip}`, RATE_LIMITS.uploadPerIp.limit, RATE_LIMITS.uploadPerIp.windowMs);
+  const perIp = checkRateLimit(`upload-ip:${ip}`, rateLimits.uploadPerIp, RATE_LIMITS.uploadPerIp.windowMs);
   if (!perIp.ok) {
     return NextResponse.json(
       { error: "Too many uploads from this network — try again later." },
